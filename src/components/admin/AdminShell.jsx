@@ -60,6 +60,18 @@ function mutedPageBackground(bgColor, accentColor) {
   return mixHex(mixHex(bgColor, accentColor || bgColor, 0.035), "#94a3b8", 0.08);
 }
 
+function accentBackgroundColor(accentColor, mode) {
+  const preset = THEME_PRESETS[mode] || THEME_PRESETS.Dark;
+  const mixAmount = 0.055;
+  return mixHex(preset.bgColor, accentColor, mixAmount);
+}
+
+function accentBorderColor(accentColor, mode) {
+  const preset = THEME_PRESETS[mode] || THEME_PRESETS.Dark;
+  const mixAmount = mode === "Light" ? 0.035 : 0.018;
+  return mixHex(preset.borderColor, accentColor, mixAmount);
+}
+
 function resolveThemeMode(themeMode) {
   if (themeMode === "System") {
     return window.matchMedia?.("(prefers-color-scheme: dark)").matches ? "Dark" : "Light";
@@ -410,23 +422,50 @@ export function AdminShell({ currentPage, children, onNavigate, appearance, onAp
     };
 
     if (patch.accentColor) {
+      const darkBgColor = accentBackgroundColor(sharedAccentColor, "Dark");
+      const lightBgColor = accentBackgroundColor(sharedAccentColor, "Light");
+      const darkBorderColor = accentBorderColor(sharedAccentColor, "Dark");
+      const lightBorderColor = accentBorderColor(sharedAccentColor, "Light");
+
       nextThemeColors.Dark = {
         ...(nextThemeColors.Dark || THEME_PRESETS.Dark),
         accentColor: sharedAccentColor,
+        bgColor: darkBgColor,
+        borderColor: darkBorderColor,
+        separatorColor: darkBorderColor,
       };
       nextThemeColors.Light = {
         ...(nextThemeColors.Light || THEME_PRESETS.Light),
         accentColor: sharedAccentColor,
+        bgColor: lightBgColor,
+        borderColor: lightBorderColor,
+        separatorColor: lightBorderColor,
       };
       nextThemeColors[currentMode] = {
         ...nextColors,
         accentColor: sharedAccentColor,
+        bgColor: currentMode === "Light" ? lightBgColor : darkBgColor,
+        borderColor: currentMode === "Light" ? lightBorderColor : darkBorderColor,
+        separatorColor: currentMode === "Light" ? lightBorderColor : darkBorderColor,
       };
     }
 
     updateAppearance({
       ...patch,
-      ...(patch.accentColor ? { accentColor: sharedAccentColor } : {}),
+      ...(patch.accentColor
+        ? {
+            accentColor: sharedAccentColor,
+            bgColor: currentMode === "Light"
+              ? nextThemeColors.Light.bgColor
+              : nextThemeColors.Dark.bgColor,
+            borderColor: currentMode === "Light"
+              ? nextThemeColors.Light.borderColor
+              : nextThemeColors.Dark.borderColor,
+            separatorColor: currentMode === "Light"
+              ? nextThemeColors.Light.separatorColor
+              : nextThemeColors.Dark.separatorColor,
+          }
+        : {}),
       themeColors: nextThemeColors,
     });
   };
