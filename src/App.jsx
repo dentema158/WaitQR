@@ -2241,6 +2241,7 @@ export default function App() {
           serviceName={serviceName}
           services={services}
           members={memberHooks.members}
+          submissions={savedSubmissions}
           theme={ticketAppearanceSettings}
           onNavigate={navigate}
         />
@@ -2335,6 +2336,7 @@ export default function App() {
           serviceName={serviceName}
           services={services}
           members={memberHooks.members}
+          submissions={savedSubmissions}
           theme={ticketAppearanceSettings}
           onNavigate={navigate}
         />

@@ -111,6 +111,7 @@ function SubmissionCard({
   submission,
   serviceName,
   services = [],
+  submissions = [],
   ticketPosition,
   ticketDeskName,
   waitEstimate,
@@ -199,7 +200,16 @@ function SubmissionCard({
     Array.isArray(member.deskIds) && member.deskIds.some((deskId) => String(deskId) === String(submission.deskId))
   ));
   const servedByName = assignedMember?.name || submission.servedByMemberName || "Team member";
-  const memberRating = Number(assignedMember?.averageRating ?? assignedMember?.rating);
+  const memberRatings = (submissions || [])
+    .filter((item) => (
+      (assignedMember?.id && String(item.servedByMemberId) === String(assignedMember.id))
+      || (servedByName && String(item.servedByMemberName || "").trim().toLowerCase() === String(servedByName).trim().toLowerCase())
+    ))
+    .map((item) => Number(item.feedbackRating))
+    .filter((rating) => rating >= 1 && rating <= 5);
+  const memberRating = memberRatings.length
+    ? memberRatings.reduce((sum, rating) => sum + rating, 0) / memberRatings.length
+    : Number(assignedMember?.averageRating ?? assignedMember?.rating);
   const ratingScore = Number(submission.feedbackRating) || 0;
   const selectedRating = RATING_OPTIONS.find((option) => option.value === ratingScore);
   const isNoLongerWaiting = isAbsent || isRemoved;
@@ -495,7 +505,7 @@ function SubmissionCard({
                 ) : null}
               </div>
               <div className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-start gap-2.5 border-t pt-3" style={{ borderColor: C.ink700 }}>
-                {servedByMember?.photo ? <img src={servedByMember.photo} alt={servedByName} className="h-9 w-9 shrink-0 rounded-full object-cover" /> : null}
+                {servedByMember?.photo ? <img src={servedByMember.photo} alt={servedByName} className="h-10 w-10 shrink-0 rounded-full border object-cover" style={{ borderColor: C.ink700 }} /> : null}
                 <div className="col-span-2 min-w-0">
                   <div className="flex items-center justify-between gap-3">
                     <div className="text-[10px] font-normal uppercase" style={{ color: C.textMuted }}>Served by</div>
@@ -606,18 +616,23 @@ function SubmissionCard({
           }}
         >
           <div className="flex flex-wrap items-start gap-2.5 border-t px-4 py-3.5" style={{ borderColor: C.ink700 }}>
-                {assignedMember?.photo ? <img src={assignedMember.photo} alt={servedByName} className="h-9 w-9 shrink-0 rounded-full object-cover" /> : null}
+                {assignedMember?.photo ? <img src={assignedMember.photo} alt={servedByName} className="h-10 w-10 shrink-0 rounded-full border object-cover" style={{ borderColor: C.ink700 }} /> : null}
             <div className="min-w-0 flex-1">
               <div className="flex min-w-0 items-center gap-2">
                 <div className="truncate text-sm font-semibold" style={{ color: C.textLight }}>{servedByName}</div>
               </div>
-              <div className="mt-0.5 flex items-center gap-1 text-[10px]" style={{ color: Number.isFinite(memberRating) ? C.amber : C.textFaint }}>
+              <div className="mt-0.5 flex items-center gap-1 text-xs" style={{ color: Number.isFinite(memberRating) ? C.amber : C.textFaint }}>
                 <span className="flex items-center" aria-label={Number.isFinite(memberRating) ? `${memberRating.toFixed(1)} out of 5` : "No ratings yet"}>
                   {[1, 2, 3, 4, 5].map((star) => (
                     <Star key={star} size={13} fill={Number.isFinite(memberRating) && star <= Math.round(memberRating) ? "currentColor" : "none"} aria-hidden="true" />
                   ))}
                 </span>
-                {Number.isFinite(memberRating) ? <span>{memberRating.toFixed(1)}</span> : null}
+                {Number.isFinite(memberRating) ? (
+                  <>
+                    <span>{memberRating.toFixed(1)}</span>
+                    <span style={{ color: C.textMuted }}>({memberRatings.length} {memberRatings.length === 1 ? "review" : "reviews"})</span>
+                  </>
+                ) : null}
               </div>
               </div>
             {isAbsent ? (
@@ -698,6 +713,7 @@ export function TicketPage({
   serviceName,
   services = [],
   members = [],
+  submissions = [],
   theme,
   onNavigate,
 }) {
@@ -881,6 +897,7 @@ export function TicketPage({
             now={now}
             theme={appearance}
             members={members}
+            submissions={submissions}
             onRequestRecall={handleRecallRequest}
             onCancelRecall={handleRecallCancel}
             onRate={handleRate}
