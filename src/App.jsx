@@ -780,15 +780,35 @@ function createSettingsPayload({ services, desks, members, appearance }) {
   };
 }
 
-function findSubmissionByLabel(label, { savedSubmissions, queue, desks }) {
+function findSubmissionByLabel(label, { savedSubmissions, queue, desks, absentList = [] }) {
   if (!label) return null;
   const normalized = String(label).toUpperCase();
 
   const matchesAccessKey = (submission) =>
     String(submission.label).toUpperCase() === normalized
     || String(submission.publicToken || "") === String(label);
+  const absentMatch = absentList.find(matchesAccessKey);
   const savedMatch = savedSubmissions.find(matchesAccessKey);
-  if (savedMatch) return savedMatch;
+  if (savedMatch) {
+    return absentMatch
+      ? {
+          ...absentMatch,
+          ...savedMatch,
+          status: savedMatch.status || "skipped",
+          deskId: savedMatch.deskId ?? absentMatch.skippedFromDesk ?? null,
+          skippedAt: savedMatch.skippedAt || absentMatch.skippedAt,
+          skippedFromDesk: savedMatch.skippedFromDesk ?? absentMatch.skippedFromDesk ?? null,
+        }
+      : savedMatch;
+  }
+
+  if (absentMatch) {
+    return {
+      ...absentMatch,
+      status: "skipped",
+      deskId: absentMatch.skippedFromDesk ?? null,
+    };
+  }
 
   const queueMatch = queue.find(matchesAccessKey);
   if (queueMatch) return queueMatch;
@@ -1791,6 +1811,7 @@ export default function App() {
           savedSubmissions,
           queue,
           desks,
+          absentList: ticketLogs.absentList,
         })
       : null;
   const recentTicketMatches = recentIssuedTicket

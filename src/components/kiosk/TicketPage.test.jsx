@@ -193,6 +193,20 @@ describe("ticket lifecycle messages", () => {
     expect(view.queryByText(/ahead of you/i)).toBeNull();
   });
 
+  it("shows a friendly called time for an absent ticket", () => {
+    const statusUpdatedAt = 61_000;
+    const view = render(
+      <TicketPage
+        {...baseProps}
+        ticket={{ ...ticket, status: "skipped", statusUpdatedAt }}
+        now={181_000}
+      />,
+    );
+
+    expect(view.getByText("Your ticket was called 2m ago.")).toBeTruthy();
+    expect(view.queryByText("Marked absent")).toBeNull();
+  });
+
   it("uses the black ticket-details panel, dashboard service icon, and site footer", () => {
     const view = render(
       <TicketPage

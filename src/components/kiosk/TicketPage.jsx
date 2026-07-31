@@ -2,17 +2,19 @@ import { useEffect, useRef, useState } from "react";
 import {
   ArrowLeft,
   Check,
-  Layers3,
+  ChevronRight,
+  ChevronUp,
   LogOut,
   MapPin,
   Smile,
   Star,
   Ticket,
   Undo2,
+  X,
 } from "lucide-react";
 import { C } from "../../lib/theme";
-import { countdownLabel, elapsedTimerLabel, finishTimeLabel, waitEstimateDisplay } from "../../lib/format";
-import { deleteSubmissionByPublicToken, getSubmissionByAccessKey, rateSubmissionByPublicToken, requestSubmissionRecall } from "../../lib/submissionsApi";
+import { countdownLabel, elapsedLabel, elapsedTimerLabel, finishTimeLabel, waitEstimateDisplay } from "../../lib/format";
+import { cancelSubmissionRecall, deleteSubmissionByPublicToken, getSubmissionByAccessKey, rateSubmissionByPublicToken, requestSubmissionRecall } from "../../lib/submissionsApi";
 import { ConfirmDialog } from "../modals/ConfirmDialog";
 
 const ticketPageStyle = {
@@ -116,14 +118,26 @@ function SubmissionCard({
   theme,
   members,
   onRequestRecall,
+  onCancelRecall,
   onRate,
   onExit,
   exitPending,
   recallRequesting,
+  recallCancelling,
   recallError,
   ratingPending,
   ratingError,
 }) {
+  const [serviceExpanded, setServiceExpanded] = useState(false);
+
+  useEffect(() => {
+    const expandTimer = window.setTimeout(() => setServiceExpanded(true), 2000);
+    const collapseTimer = window.setTimeout(() => setServiceExpanded(false), 7000);
+    return () => {
+      window.clearTimeout(expandTimer);
+      window.clearTimeout(collapseTimer);
+    };
+  }, []);
   const appearance = {
     accentColor: theme?.accentColor || C.amber,
     bgColor: theme?.bgColor || C.ink900,
@@ -167,16 +181,33 @@ function SubmissionCard({
   const isCompleted = submission.status === "completed";
   const isAbsent = submission.status === "skipped" || submission.status === "absent";
   const isRemoved = submission.status === "removed";
+  const counterLabel = isRemoved
+    ? "Ticket cancelled"
+    : isAbsent
+      ? "Marked absent"
+      : isCalled
+        ? "Please proceed to"
+        : isServing
+          ? "Serving at"
+          : "Proceed to";
   const normalizedServedByName = String(submission.servedByMemberName || "").trim().toLocaleLowerCase();
   const servedByMember = (members || []).find((member) => (
     String(member.id) === String(submission.servedByMemberId)
     || (normalizedServedByName && String(member.name || "").trim().toLocaleLowerCase() === normalizedServedByName)
   ));
-  const servedByName = servedByMember?.name || submission.servedByMemberName || "Team member";
+  const assignedMember = servedByMember || (members || []).find((member) => (
+    Array.isArray(member.deskIds) && member.deskIds.some((deskId) => String(deskId) === String(submission.deskId))
+  ));
+  const servedByName = assignedMember?.name || submission.servedByMemberName || "Team member";
+  const memberRating = Number(assignedMember?.averageRating ?? assignedMember?.rating);
   const ratingScore = Number(submission.feedbackRating) || 0;
   const selectedRating = RATING_OPTIONS.find((option) => option.value === ratingScore);
   const isNoLongerWaiting = isAbsent || isRemoved;
   const recallRequested = Boolean(submission.recallRequestedAt);
+  const absentCalledAt = submission.skippedAt || submission.statusUpdatedAt || submission.calledAt;
+  const absentCalledLabel = absentCalledAt
+    ? `You were called ${elapsedLabel(now - absentCalledAt)} ago.`
+    : "You were called.";
   const livePosition = Number(ticketPosition);
   const initialPosition = Number(submission.joinedPosition);
   const effectivePosition = Number.isFinite(livePosition) && livePosition > 0
@@ -402,34 +433,9 @@ function SubmissionCard({
                 <div className="text-3xl font-semibold leading-tight sm:text-4xl" style={{ color: C.coral }}>
                   {isAbsent ? "You were missed" : "Ticket removed"}
                 </div>
-                <div className="mt-2 text-[10px] font-semibold uppercase" style={{ color: C.coral }}>
-                  {isAbsent ? "Marked absent" : "No longer in queue"}
+                <div className="mt-2 max-w-52 text-center text-xs leading-snug" style={{ color: withAlpha(appearance.fontColor, 0.68) }}>
+                  {isAbsent ? absentCalledLabel : "No longer in queue"}
                 </div>
-                {isAbsent ? (
-                  <>
-                    <button
-                      type="button"
-                      onClick={onRequestRecall}
-                      disabled={recallRequested || recallRequesting}
-                      className="qp-focusable mt-5 inline-flex h-8 items-center justify-center gap-1.5 px-3 text-xs font-semibold leading-none disabled:cursor-default"
-                      style={{
-                        color: C.teal,
-                        backgroundColor: recallRequested ? C.tealSoft : "transparent",
-                        borderRadius: Math.min(appearance.radius, 6),
-                      }}
-                    >
-                      <Undo2 size={13} className="block shrink-0" aria-hidden="true" />
-                      <span className="leading-none">
-                        {recallRequested ? "Recall requested" : recallRequesting ? "Requesting..." : "Recall me"}
-                      </span>
-                    </button>
-                    {recallError ? (
-                      <p className="mb-0 mt-1 max-w-48 text-center text-[10px]" style={{ color: C.coral }}>
-                        {recallError}
-                      </p>
-                    ) : null}
-                  </>
-                ) : null}
               </>
             ) : hasQueuePosition ? (
               <>
@@ -466,7 +472,12 @@ function SubmissionCard({
 
       </section>
 
-      <section className="overflow-hidden" style={detailsPanelStyle} aria-label="Ticket details">
+      <section
+        className="overflow-hidden"
+        style={{ ...detailsPanelStyle, cursor: isCompleted ? "default" : "pointer" }}
+        aria-label="Ticket details"
+        onClick={isCompleted ? undefined : () => setServiceExpanded((expanded) => !expanded)}
+      >
         {isCompleted ? (
           <>
             <div className="grid gap-y-3 px-4 py-4">
@@ -484,11 +495,7 @@ function SubmissionCard({
                 ) : null}
               </div>
               <div className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-start gap-2.5 border-t pt-3" style={{ borderColor: C.ink700 }}>
-                <span className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-full bg-slate-700 text-xs font-semibold text-white">
-                  {servedByMember?.photo ? (
-                    <img src={servedByMember.photo} alt={servedByName} className="h-full w-full object-cover" />
-                  ) : initials(servedByName)}
-                </span>
+                {servedByMember?.photo ? <img src={servedByMember.photo} alt={servedByName} className="h-9 w-9 shrink-0 rounded-full object-cover" /> : null}
                 <div className="col-span-2 min-w-0">
                   <div className="flex items-center justify-between gap-3">
                     <div className="text-[10px] font-normal uppercase" style={{ color: C.textMuted }}>Served by</div>
@@ -552,32 +559,11 @@ function SubmissionCard({
             className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border"
             style={{ color: statusAccent, borderColor: C.ink700 }}
           >
-            <Layers3 size={19} />
-          </span>
-          <div className="min-w-0 flex-1">
-            <div className="text-[10px] font-semibold uppercase" style={{ color: C.textMuted }}>
-              Service
-            </div>
-            <div
-              data-testid="ticket-service-value"
-              className="mt-0.5 truncate text-base font-semibold"
-              style={{ color: statusAccent }}
-            >
-              {serviceLine}
-            </div>
-          </div>
-        </div>
-        <div className="mx-4 border-t" style={{ borderColor: C.ink700 }} />
-        <div className="flex items-center gap-3 px-4 py-3.5">
-          <span
-            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border"
-            style={{ color: statusAccent, borderColor: C.ink700 }}
-          >
             <MapPin size={19} />
           </span>
           <div className="min-w-0">
             <div className="text-[10px] font-semibold uppercase" style={{ color: C.textMuted }}>
-              Counter
+              {counterLabel}
             </div>
             <div
               data-testid="ticket-counter-value"
@@ -593,24 +579,109 @@ function SubmissionCard({
                 {serviceTimer}
               </span>
             ) : null}
-            {submission.publicToken && (isQueued || isCalled) ? (
-              <button
-                type="button"
-                onClick={onExit}
-                disabled={exitPending}
-                title="Exit and delete ticket"
-                aria-label="Exit ticket"
-                className="qp-focusable inline-flex h-8 w-8 items-center justify-center disabled:cursor-wait disabled:opacity-50"
-                style={{ color: C.coral, backgroundColor: C.coralSoft, borderRadius: Math.min(appearance.radius, 6) }}
-              >
-                <LogOut size={15} aria-hidden="true" />
-              </button>
+            <button
+              type="button"
+              onClick={(event) => {
+                event.stopPropagation();
+                setServiceExpanded((expanded) => !expanded);
+              }}
+              aria-expanded={serviceExpanded}
+              aria-controls="ticket-service-details"
+              aria-label={serviceExpanded ? "Hide service details" : "Show service details"}
+              className="qp-focusable inline-flex h-8 w-8 items-center justify-center"
+              style={{ color: statusAccent }}
+            >
+              {serviceExpanded ? <ChevronUp size={19} aria-hidden="true" /> : <ChevronRight size={19} aria-hidden="true" />}
+            </button>
+          </div>
+        </div>
+        <div
+          id="ticket-service-details"
+          aria-hidden={!serviceExpanded}
+          className="overflow-hidden transition-[max-height,opacity,transform] duration-500 ease-out"
+          style={{
+            maxHeight: serviceExpanded ? 220 : 0,
+            opacity: serviceExpanded ? 1 : 0,
+            transform: serviceExpanded ? "translateY(0)" : "translateY(-6px)",
+          }}
+        >
+          <div className="flex flex-wrap items-start gap-2.5 border-t px-4 py-3.5" style={{ borderColor: C.ink700 }}>
+                {assignedMember?.photo ? <img src={assignedMember.photo} alt={servedByName} className="h-9 w-9 shrink-0 rounded-full object-cover" /> : null}
+            <div className="min-w-0 flex-1">
+              <div className="flex min-w-0 items-center gap-2">
+                <div className="truncate text-sm font-semibold" style={{ color: C.textLight }}>{servedByName}</div>
+              </div>
+              <div className="mt-0.5 flex items-center gap-1 text-[10px]" style={{ color: Number.isFinite(memberRating) ? C.amber : C.textFaint }}>
+                <span className="flex items-center" aria-label={Number.isFinite(memberRating) ? `${memberRating.toFixed(1)} out of 5` : "No ratings yet"}>
+                  {[1, 2, 3, 4, 5].map((star) => (
+                    <Star key={star} size={13} fill={Number.isFinite(memberRating) && star <= Math.round(memberRating) ? "currentColor" : "none"} aria-hidden="true" />
+                  ))}
+                </span>
+                {Number.isFinite(memberRating) ? <span>{memberRating.toFixed(1)}</span> : null}
+              </div>
+              </div>
+            {isAbsent ? (
+                <div className="ml-auto max-w-[42%] shrink-0">
+                  <button
+                    type="button"
+                    onClick={(event) => { event.stopPropagation(); (recallRequested ? onCancelRecall : onRequestRecall)(); }}
+                    disabled={recallRequesting || recallCancelling}
+                    className="qp-focusable inline-flex h-8 max-w-full items-center justify-center gap-1 whitespace-nowrap px-2.5 text-[11px] font-semibold disabled:cursor-default"
+                    style={{
+                      color: recallRequested ? C.coral : C.teal,
+                      backgroundColor: recallRequested ? C.coralSoft : C.tealSoft,
+                      borderRadius: Math.min(appearance.radius, 6),
+                    }}
+                  >
+                    {recallRequested ? <X size={13} aria-hidden="true" /> : <Undo2 size={13} aria-hidden="true" />}
+                    <span>{recallRequested ? (recallCancelling ? "Cancelling..." : "Cancel recall") : recallRequesting ? "Requesting..." : "Recall me"}</span>
+                  </button>
+                  {recallError ? <p className="mt-1 text-[10px]" style={{ color: C.coral }}>{recallError}</p> : null}
+                </div>
             ) : null}
+            {assignedMember?.about ? (
+              <div
+                className="basis-full overflow-hidden text-[10px]"
+                style={{ color: C.textMuted, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" }}
+              >
+                {assignedMember.about}
+              </div>
+            ) : null}
+          </div>
+          <div className="flex items-center gap-3 px-4 py-3.5">
+            {selectedService?.image ? (
+              <img
+                src={selectedService.image}
+                alt=""
+                className="h-10 w-10 shrink-0 rounded-md object-cover"
+              />
+            ) : null}
+            <div className="min-w-0 flex-1">
+              <div className="text-[10px] font-semibold uppercase" style={{ color: C.textMuted }}>Service</div>
+              <div data-testid="ticket-service-value" className="mt-0.5 truncate text-base font-semibold" style={{ color: C.textLight }}>
+                {serviceLine}
+              </div>
+            </div>
+            {priceLabel ? <div className="qp-mono shrink-0 text-base font-semibold" style={{ color: C.teal }}>{priceLabel}</div> : null}
           </div>
         </div>
           </>
         )}
       </section>
+
+      {submission.publicToken && (isQueued || isCalled) ? (
+        <button
+          type="button"
+          onClick={onExit}
+          disabled={exitPending}
+          title="Leave ticket"
+          className="qp-focusable inline-flex min-h-10 w-full items-center justify-center gap-2 px-4 text-sm font-semibold disabled:cursor-wait disabled:opacity-50"
+          style={{ color: C.coral, backgroundColor: C.coralSoft, borderRadius: Math.min(appearance.radius, 6) }}
+        >
+          <LogOut size={16} aria-hidden="true" />
+          <span>{exitPending ? "Leaving..." : "Leave"}</span>
+        </button>
+      ) : null}
 
     </div>
   );
@@ -634,6 +705,7 @@ export function TicketPage({
   const [loading, setLoading] = useState(!ticket);
   const [error, setError] = useState("");
   const [recallRequesting, setRecallRequesting] = useState(false);
+  const [recallCancelling, setRecallCancelling] = useState(false);
   const [recallError, setRecallError] = useState("");
   const [exitConfirmOpen, setExitConfirmOpen] = useState(false);
   const [exitPending, setExitPending] = useState(false);
@@ -703,6 +775,21 @@ export function TicketPage({
       setRecallError(requestError.message || "Could not request a recall.");
     } finally {
       setRecallRequesting(false);
+    }
+  };
+
+  const handleRecallCancel = async () => {
+    if (!submission?.id || recallRequesting || !submission.recallRequestedAt) return;
+    setRecallCancelling(true);
+    setRecallError("");
+
+    try {
+      const updatedSubmission = await cancelSubmissionRecall(submission.id);
+      if (updatedSubmission) setSubmission(updatedSubmission);
+    } catch (requestError) {
+      setRecallError(requestError.message || "Could not cancel the recall.");
+    } finally {
+      setRecallCancelling(false);
     }
   };
 
@@ -795,10 +882,12 @@ export function TicketPage({
             theme={appearance}
             members={members}
             onRequestRecall={handleRecallRequest}
+            onCancelRecall={handleRecallCancel}
             onRate={handleRate}
             onExit={() => setExitConfirmOpen(true)}
             exitPending={exitPending}
             recallRequesting={recallRequesting}
+            recallCancelling={recallCancelling}
             recallError={recallError}
             ratingPending={ratingPending}
             ratingError={ratingError}
