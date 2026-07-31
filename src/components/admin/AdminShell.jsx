@@ -112,7 +112,7 @@ function ThemeSwitch({ theme, onChange, accent, fontColor, borderColor, bgColor,
   const Current = options.find((option) => option.value === theme)?.icon || Monitor;
 
   return (
-    <div className="relative z-50" ref={ref}>
+    <div className="relative z-[110]" ref={ref}>
       <button
         type="button"
         onClick={() => setOpen((value) => !value)}
@@ -125,7 +125,7 @@ function ThemeSwitch({ theme, onChange, accent, fontColor, borderColor, bgColor,
       </button>
       {open && (
         <div
-          className="absolute right-0 top-full z-50 mt-2 w-36 overflow-hidden border py-1 shadow-lg"
+          className="fixed right-3 top-14 z-[120] mt-0 w-36 overflow-hidden border py-1 shadow-lg sm:absolute sm:right-0 sm:top-full sm:z-[120] sm:mt-2"
           style={{ backgroundColor: bgColor, borderColor, borderRadius: radius }}
         >
           {options.map(({ value, icon: Icon, label }) => {
@@ -173,7 +173,7 @@ function ProfileMenu({ member, masterLoggedIn, accentColor, fontColor, borderCol
   };
 
   return (
-    <div className="relative z-50" ref={ref}>
+    <div className="relative z-[110]" ref={ref}>
       <button
         type="button"
         onClick={() => setOpen((value) => !value)}
@@ -196,7 +196,7 @@ function ProfileMenu({ member, masterLoggedIn, accentColor, fontColor, borderCol
       </button>
       {open && (
         <div
-          className="absolute right-0 top-full z-50 mt-2 w-40 overflow-hidden border py-1 shadow-lg"
+          className="fixed right-3 top-14 z-[120] mt-0 w-40 overflow-hidden border py-1 shadow-lg sm:absolute sm:right-0 sm:top-full sm:z-[120] sm:mt-2"
           style={{ backgroundColor: bgColor, borderColor, borderRadius: radius }}
         >
           {member || masterLoggedIn ? (
@@ -518,7 +518,7 @@ export function AdminShell({ currentPage, children, onNavigate, appearance, onAp
 
       <main className="min-w-0 flex-1" style={{ backgroundColor: pageBgColor }}>
         <div
-          className="sticky top-0 z-40 flex items-center justify-between gap-3 px-2.5 py-2.5 sm:px-6 sm:py-5 md:pl-10 md:pr-6"
+          className="sticky top-0 z-[100] flex items-center justify-between gap-3 px-2.5 py-2.5 sm:px-6 sm:py-5 md:pl-10 md:pr-6"
           style={{ backgroundColor: "var(--page-bg)" }}
         >
           <div className="min-w-0">

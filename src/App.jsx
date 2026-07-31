@@ -2151,7 +2151,15 @@ export default function App() {
           onNavigate={navigate}
         />
       ) : currentPage === "desk" && !activeDesk && !adminAuthenticated ? (
-        <div className="flex min-h-screen w-full flex-col" style={{ backgroundColor: activeCounterPageBackground, color: activeAppearanceSettings.fontColor }}>
+        <div
+          className="flex min-h-screen w-full flex-col"
+          style={{
+            backgroundColor: activeCounterPageBackground,
+            color: activeAppearanceSettings.fontColor,
+            "--surface-bg": activeAppearanceSettings.bgColor,
+            "--page-bg": activeCounterPageBackground,
+          }}
+        >
           <ProfileHeader
             loggedInMember={activeLoggedInMember}
             masterLoggedIn={activeMasterLoggedIn}
@@ -2172,7 +2180,15 @@ export default function App() {
       ) : currentPage === "desk" && activeDesk && !canAccessActiveDesk ? (
         <CounterPermissionDenied desk={activeDesk} member={activeLoggedInMember} members={memberHooks.members} theme={activeAppearanceSettings} onNavigate={navigate} />
       ) : currentPage === "desk" && activeDesk && !adminAuthenticated ? (
-        <div className="flex min-h-screen w-full flex-col" style={{ backgroundColor: activeCounterPageBackground, color: activeAppearanceSettings.fontColor }}>
+        <div
+          className="flex min-h-screen w-full flex-col"
+          style={{
+            backgroundColor: activeCounterPageBackground,
+            color: activeAppearanceSettings.fontColor,
+            "--surface-bg": activeAppearanceSettings.bgColor,
+            "--page-bg": activeCounterPageBackground,
+          }}
+        >
           <ProfileHeader
             loggedInMember={activeLoggedInMember}
             masterLoggedIn={activeMasterLoggedIn}
