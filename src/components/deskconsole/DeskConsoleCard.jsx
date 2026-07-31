@@ -1,0 +1,710 @@
+import { ArrowRight, CalendarDays, Check, Clock3, Coffee, Layers3, Lock, Phone, Ticket, Undo2, Unlock, UserRound, X } from "lucide-react";
+import { useState } from "react";
+import { createPortal } from "react-dom";
+import { C } from "../../lib/theme";
+import { elapsedLabel, elapsedTimerLabel } from "../../lib/format";
+import { SnoozingCat } from "../shared/SnoozingCat";
+import { selectNextTicketForDesk } from "../../hooks/useQueue";
+
+const DEFAULT_SCHEDULE = { entries: [{ days: [1], startTime: "09:00", endTime: "17:00" }] };
+const WEEK_DAYS = [
+  { value: 1, label: "Mon" },
+  { value: 2, label: "Tue" },
+  { value: 3, label: "Wed" },
+  { value: 4, label: "Thu" },
+  { value: 5, label: "Fri" },
+  { value: 6, label: "Sat" },
+  { value: 0, label: "Sun" },
+];
+
+function withAlpha(hex, alphaHex) {
+  if (typeof hex !== "string" || !/^#?[0-9a-f]{6}$/i.test(hex)) return hex;
+  return `${hex.startsWith("#") ? hex : `#${hex}`}${alphaHex}`;
+}
+
+function hexToRgb(hex) {
+  if (typeof hex !== "string" || !/^#?[0-9a-f]{6}$/i.test(hex)) return null;
+  const clean = hex.replace("#", "");
+  return {
+    r: parseInt(clean.slice(0, 2), 16),
+    g: parseInt(clean.slice(2, 4), 16),
+    b: parseInt(clean.slice(4, 6), 16),
+  };
+}
+
+function isLightHex(hex) {
+  const rgb = hexToRgb(hex);
+  if (!rgb) return false;
+  return (rgb.r * 299 + rgb.g * 587 + rgb.b * 114) / 1000 > 180;
+}
+
+function normalizeSchedule(schedule) {
+  const source = schedule && typeof schedule === "object" ? schedule : {};
+  const sourceEntries = Array.isArray(source.entries) && source.entries.length
+    ? source.entries
+    : Array.isArray(source.days)
+      ? [{ days: source.days, startTime: source.startTime, endTime: source.endTime }]
+      : DEFAULT_SCHEDULE.entries;
+
+  const entries = sourceEntries
+    .map((entry) => ({
+      days: (Array.isArray(entry?.days) ? entry.days : [entry?.day]).map(Number).filter((day) => day >= 0 && day <= 6),
+      startTime: entry?.startTime || "09:00",
+      endTime: entry?.endTime || "17:00",
+    }))
+    .filter((entry) => entry.days.length > 0);
+
+  return { entries: entries.length ? entries : DEFAULT_SCHEDULE.entries };
+}
+
+function timeToMinutes(time) {
+  const [hours, minutes] = String(time || "").split(":").map(Number);
+  if (!Number.isFinite(hours) || !Number.isFinite(minutes)) return null;
+  return hours * 60 + minutes;
+}
+
+function formatScheduleTime(time) {
+  const [hours, minutes] = String(time || "").split(":").map(Number);
+  if (!Number.isFinite(hours) || !Number.isFinite(minutes)) return "";
+  const period = hours >= 12 ? "PM" : "AM";
+  const displayHours = hours % 12 || 12;
+  return `${String(displayHours).padStart(2, "0")}:${String(minutes).padStart(2, "0")} ${period}`;
+}
+
+function formatScheduleRange(entry) {
+  return `${formatScheduleTime(entry.startTime)} - ${formatScheduleTime(entry.endTime)}`;
+}
+
+function formatJoinedDateTime(timestamp) {
+  const date = new Date(timestamp);
+  if (Number.isNaN(date.getTime())) return "—";
+
+  return date.toLocaleString([], {
+    dateStyle: "short",
+    timeStyle: "short",
+  });
+}
+
+function scheduleDayRows(schedule) {
+  const normalized = normalizeSchedule(schedule);
+  return WEEK_DAYS.map((day) => {
+    const entries = normalized.entries.filter((entry) => entry.days.includes(day.value));
+    return {
+      ...day,
+      time: entries.length ? entries.map(formatScheduleRange).join(", ") : "Closed",
+      open: entries.length > 0,
+    };
+  });
+}
+
+function isScheduleOpenNow(schedule, now = new Date()) {
+  const normalized = normalizeSchedule(schedule);
+  const currentDay = now.getDay();
+  const previousDay = (currentDay + 6) % 7;
+  const currentMinutes = now.getHours() * 60 + now.getMinutes();
+
+  return normalized.entries.some((entry) => {
+    const start = timeToMinutes(entry.startTime);
+    const end = timeToMinutes(entry.endTime);
+    if (start == null || end == null) return false;
+
+    if (start <= end) {
+      return entry.days.includes(currentDay) && currentMinutes >= start && currentMinutes < end;
+    }
+
+    return (entry.days.includes(currentDay) && currentMinutes >= start) || (entry.days.includes(previousDay) && currentMinutes < end);
+  });
+}
+
+function deskAvailability(desk, now) {
+  const mode = desk.status === "Scheduled"
+    ? "scheduled"
+    : desk.status === "Unavailable"
+      ? "always_closed"
+      : desk.status === "Available"
+        ? "always_open"
+        : desk.availabilityMode || "always_open";
+  if (mode === "scheduled" || desk.status === "Scheduled") {
+    const open = isScheduleOpenNow(desk.schedule, new Date(now));
+    return {
+      mode: "scheduled",
+      open,
+      dot: open ? C.teal : C.amber,
+      label: open ? "Scheduled open" : "Scheduled closed",
+    };
+  }
+
+  const open = mode !== "always_closed" && desk.status !== "Unavailable" && !desk.locked;
+  return {
+    mode,
+    open,
+    dot: open ? C.teal : C.coral,
+    label: open ? "Open" : "Closed",
+  };
+}
+
+export function DeskConsoleCard({
+  desk: d,
+  now,
+  serviceName,
+  theme,
+  serviceWord,
+  serviceWordLower,
+  serviceWordPluralLower,
+  deskWordLower,
+  queue,
+  eligibleForDesk,
+  completingDesk,
+  completingTicket,
+  startingDesk,
+  startingTicket,
+  skippingDesk,
+  skippingTicket,
+  callNext,
+  startService,
+  completeTicket,
+  skipTicket,
+  recallPreview = null,
+  recallTicket,
+  cancelRecallRequest,
+  askConfirm,
+  updateDesk,
+  readOnlyQueued = false,
+  actionDeskId = d.id,
+  actionTicketId = null,
+  allowCounterStatusControls = true,
+  showCounterStatusButton = true,
+  hideInCardCounterStatus = false,
+  showCounterStatusAbove = false,
+}) {
+  const [statusOpen, setStatusOpen] = useState(false);
+  const [draftStatusMode, setDraftStatusMode] = useState("always_open");
+  // Break state belongs to the shared desk record so every counter and the
+  // public live board receive it through the real-time desk-status update.
+  const isOnBreak = Boolean(d.onBreak);
+  const isRecallPreview = Boolean(!d.current && recallPreview);
+  const canCallNext = !d.current && (isRecallPreview || queue.some(eligibleForDesk(d)));
+  const previewTicket = !d.current ? recallPreview || selectNextTicketForDesk(queue, d) : null;
+
+  const t = d.current || previewTicket;
+  const label = t ? t.label : null;
+  const name = t ? t.name : null;
+  const phone = t ? t.phone : null;
+  const svcId = t ? t.serviceId : null;
+  const isPri = t?.type === "priority";
+  const activeTicketId = actionTicketId || d.current?.id || null;
+  const isCompletingThisTicket = completingTicket != null
+    ? String(completingTicket) === String(activeTicketId)
+    : completingDesk === d.id;
+  const isStartingThisTicket = startingTicket != null
+    ? String(startingTicket) === String(activeTicketId)
+    : startingDesk === d.id;
+  const isSkippingThisTicket = skippingTicket != null
+    ? String(skippingTicket) === String(activeTicketId)
+    : skippingDesk === d.id;
+  const isPrimaryBusy = isCompletingThisTicket || isStartingThisTicket;
+  const actionsDisabled = readOnlyQueued;
+  const availability = deskAvailability(d, now);
+  const isServing = Boolean(d.current?.startedAt);
+  const servingPanelLabel = d.current
+    ? (d.current.startedAt ? "Now Serving" : "Called")
+    : isRecallPreview
+      ? "Recall requested"
+      : "Next Up";
+  const servingPanelTone = d.current
+    ? (d.current.startedAt ? "now-serving" : "called")
+    : isRecallPreview
+      ? "recall-requested"
+      : "next-up";
+  const primaryLabel = !d.current
+    ? (isRecallPreview ? "Recall" : "Call Next")
+    : !d.current.startedAt
+      ? "Start Serving"
+      : "Mark Complete";
+  const primaryIcon = d.current?.startedAt
+    ? <Check size={15} />
+    : isRecallPreview
+      ? <Undo2 size={15} />
+      : <ArrowRight size={15} />;
+  const primaryIconClass = d.current?.startedAt
+    ? "qp-desk-primary-icon qp-desk-primary-icon--complete"
+    : "qp-desk-primary-icon qp-desk-primary-icon--arrow";
+  const timerLabel = d.current?.startedAt ? elapsedTimerLabel(now - d.current.startedAt) : null;
+  const scheduleRows = scheduleDayRows(d.schedule);
+  const currentScheduleDay = new Date(now).getDay();
+  const currentScheduleColor = isScheduleOpenNow(d.schedule, new Date(now)) ? C.teal : C.amber;
+  const surfaceTheme = {
+    accentColor: theme?.accentColor || C.blue,
+    bgColor: theme?.bgColor || C.ink900,
+    fontColor: theme?.fontColor || C.textLight,
+    borderColor: theme?.borderColor || C.ink700,
+    radius: theme?.radius || 8,
+  };
+  const mutedColor = withAlpha(surfaceTheme.fontColor, "80");
+  const faintColor = withAlpha(surfaceTheme.fontColor, "55");
+  const isLightSurface = isLightHex(surfaceTheme.bgColor);
+  const cardBackground = surfaceTheme.bgColor;
+  const cardShadow = isLightSurface
+    ? "0 16px 36px rgba(15, 23, 42, 0.12), 0 2px 8px rgba(15, 23, 42, 0.06)"
+    : `0 12px 30px ${withAlpha(surfaceTheme.bgColor, "22")}`;
+  const controlBackground = withAlpha(surfaceTheme.fontColor, "12");
+  const primaryBg = isOnBreak && !d.current
+    ? "#8B919C"
+    : !d.current
+      ? surfaceTheme.accentColor
+      : !d.current.startedAt
+        ? C.amber
+        : C.teal;
+
+  const handlePrimaryAction = () => {
+    if (actionsDisabled) return;
+
+    if (!d.current) {
+      if (isRecallPreview) {
+        recallTicket?.(recallPreview.id);
+      } else {
+        callNext(actionDeskId);
+      }
+      return;
+    }
+
+    if (!d.current.startedAt) {
+      startService(actionDeskId, actionTicketId);
+      return;
+    }
+
+    completeTicket(actionDeskId, actionTicketId);
+  };
+
+  const handleCancelTicket = () => {
+    if (!d.current?.startedAt || !askConfirm) {
+      skipTicket(actionDeskId, actionTicketId);
+      return;
+    }
+
+    askConfirm(
+      "Cancel serving ticket?",
+      `Cancel ticket ${d.current.label}${d.current.name ? ` for ${d.current.name}` : ""}? The active service will stop and the ticket will move to the absent list.`,
+      () => skipTicket(actionDeskId, actionTicketId),
+      { confirmLabel: "Cancel ticket", variant: "destructive" }
+    );
+  };
+
+  const updateDeskAvailability = (mode) => {
+    const currentSchedule = normalizeSchedule(d.schedule);
+    const next = mode === "scheduled"
+      ? {
+          availabilityMode: "scheduled",
+          status: "Scheduled",
+          schedule: currentSchedule,
+          locked: !isScheduleOpenNow(currentSchedule, new Date(now)),
+        }
+      : mode === "always_closed"
+        ? {
+            availabilityMode: "always_closed",
+            status: "Unavailable",
+            schedule: d.schedule ? currentSchedule : null,
+            locked: true,
+          }
+        : {
+            availabilityMode: "always_open",
+            status: "Available",
+            schedule: d.schedule ? currentSchedule : null,
+            locked: false,
+          };
+
+    updateDesk?.(d.id, next);
+    setStatusOpen(false);
+  };
+
+  const openStatusDialog = () => {
+    if (!allowCounterStatusControls) return;
+    setDraftStatusMode(availability.mode);
+    setStatusOpen(true);
+  };
+
+  const statusIcon = availability.mode === "scheduled"
+    ? <CalendarDays size={14} />
+    : availability.open
+      ? <Unlock size={14} />
+      : <Lock size={14} />;
+
+  const renderDeskActions = (className = "qp-desk-ticket-actions") => (
+    <div className={`${className} ${isOnBreak && !d.current ? "qp-desk-ticket-actions--break" : ""}`} onClick={(e) => e.stopPropagation()}>
+      <button
+          type="button"
+          onClick={handlePrimaryAction}
+          disabled={actionsDisabled || (!d.current ? !canCallNext || isPrimaryBusy || isOnBreak : isPrimaryBusy)}
+          title={
+            actionsDisabled
+              ? "Finish the current ticket before starting this called ticket"
+              : !d.current
+              ? canCallNext
+                ? isRecallPreview
+                  ? "Recall requested ticket"
+                  : "Call next"
+                : `No waiting tickets match this ${deskWordLower}'s ${serviceWordPluralLower}`
+              : !d.current.startedAt
+                ? "Start serving this ticket"
+                : "Mark ticket complete"
+          }
+          aria-hidden={isOnBreak && !d.current}
+          tabIndex={isOnBreak && !d.current ? -1 : undefined}
+          className={`qp-focusable qp-desk-primary-action disabled:cursor-not-allowed disabled:opacity-30 ${isOnBreak && !d.current ? "qp-desk-primary-action--break-hidden" : ""}`}
+          style={{
+            borderColor: "transparent",
+            color: C.textLight,
+            backgroundColor: primaryBg,
+            borderRadius: surfaceTheme.radius,
+          }}
+        >
+          <span>{primaryLabel}</span>
+          <span className={primaryIconClass} aria-hidden="true">{primaryIcon}</span>
+      </button>
+
+      {!d.current && isRecallPreview ? (
+        <button
+          type="button"
+          onClick={() => cancelRecallRequest?.(recallPreview.id)}
+          title="Cancel recall request"
+          className="qp-focusable qp-desk-secondary-action qp-desk-cancel-action"
+          style={{
+            borderColor: "transparent",
+            color: C.coral,
+            background: controlBackground,
+            borderRadius: surfaceTheme.radius,
+          }}
+        >
+          <X size={15} />
+          <span>Cancel</span>
+        </button>
+      ) : !d.current ? (
+        <button
+          type="button"
+          onClick={() => updateDesk?.(d.id, { onBreak: !isOnBreak })}
+          aria-pressed={isOnBreak}
+          title={isOnBreak ? "End break" : "Take a break"}
+          className={`qp-focusable qp-desk-secondary-action qp-desk-break-action disabled:opacity-30 ${isOnBreak ? "qp-desk-break-action--active" : ""}`}
+          style={{
+            borderColor: surfaceTheme.borderColor,
+            color: mutedColor,
+            background: controlBackground,
+            borderRadius: surfaceTheme.radius,
+          }}
+        >
+          <Coffee size={15} />
+          <span>{isOnBreak ? "End Break" : "Break"}</span>
+        </button>
+      ) : (
+        <button
+          type="button"
+          onClick={handleCancelTicket}
+          disabled={actionsDisabled || isSkippingThisTicket}
+          title={actionsDisabled ? "Finish the current ticket before cancelling this called ticket" : "Cancel as absent / no-show"}
+          className="qp-focusable qp-desk-secondary-action qp-desk-cancel-action disabled:cursor-not-allowed disabled:opacity-30"
+          style={{ borderColor: "transparent", background: controlBackground, color: C.coral, borderRadius: surfaceTheme.radius }}
+        >
+          <X size={15} />
+          <span>Cancel</span>
+        </button>
+      )}
+    </div>
+  );
+
+  const renderDeskStatusButton = (onAccent = false) => (
+    showCounterStatusButton ? (
+    <button
+      type="button"
+      onClick={readOnlyQueued || !allowCounterStatusControls ? undefined : openStatusDialog}
+      disabled={readOnlyQueued || !allowCounterStatusControls}
+      className={`qp-focusable flex min-w-0 items-center gap-1.5 rounded-full py-0.5 text-left transition-colors ${readOnlyQueued || !allowCounterStatusControls ? "cursor-default" : "hover:bg-white/5"}`}
+      title={availability.label}
+    >
+      <span
+        className="qp-desk-status-icon inline-flex shrink-0 items-center justify-center"
+        aria-hidden="true"
+        style={{ color: onAccent ? "var(--qp-serving-panel-muted)" : availability.dot }}
+      >
+        {statusIcon}
+      </span>
+      <span className="min-w-0 truncate text-xs font-semibold uppercase tracking-wider" style={{ color: onAccent ? "var(--qp-serving-panel-muted)" : mutedColor }}>
+        {d.name}
+      </span>
+      <span className="sr-only">{availability.label}</span>
+    </button>
+    ) : null
+  );
+
+  return (
+    <div className="qp-console-card">
+      {showCounterStatusAbove ? (
+        <div className="qp-desk-top-status-row" onClick={(e) => e.stopPropagation()}>
+          {renderDeskStatusButton(false)}
+        </div>
+      ) : null}
+      <div>
+        <div className="flex flex-col gap-4">
+          {t ? (
+            <div
+              className={`qp-desk-ticket-frame ${isOnBreak && !d.current ? "qp-desk-ticket-frame--break" : ""}`}
+              style={{
+                "--qp-desk-accent": surfaceTheme.accentColor,
+                "--qp-desk-status-accent": primaryBg,
+                "--qp-desk-details-bg": cardBackground,
+                "--qp-desk-details-text": surfaceTheme.fontColor,
+                "--qp-desk-details-muted": mutedColor,
+                "--qp-desk-details-faint": faintColor,
+                "--qp-desk-details-border": withAlpha(surfaceTheme.borderColor, "88"),
+                "--qp-desk-details-action-bg": cardBackground,
+                "--qp-desk-frame-bg": cardBackground,
+                "--qp-desk-frame-shadow": cardShadow,
+                "--qp-ticket-side-bg": primaryBg,
+                "--qp-desk-radius": `${surfaceTheme.radius * 1.2}px`,
+                borderColor: "transparent",
+              }}
+            >
+              <div className="qp-desk-ticket-main">
+                <section className={`qp-desk-serving-panel qp-desk-serving-panel--${servingPanelTone} ${isOnBreak && !d.current ? "qp-desk-serving-panel--break" : ""}`}>
+                  {hideInCardCounterStatus ? null : (
+                    <div className="qp-desk-serving-header" onClick={(e) => e.stopPropagation()}>
+                      {renderDeskStatusButton(true)}
+                    </div>
+                  )}
+
+                  <div className="qp-desk-serving-caption">
+                    <span className="qp-desk-caption-icon"><Ticket size={15} /></span>
+                    <span>{servingPanelLabel}</span>
+                  </div>
+
+                  <div className={`qp-desk-ticket-number qp-ticket-face ${isPri ? "qp-priority-ticket" : ""}`}>{label}</div>
+                  <div className="qp-desk-serving-name truncate">{name || "—"}</div>
+                  <div className="qp-desk-service-pill truncate">{svcId ? serviceName(svcId) : "—"}</div>
+
+                  <div className="qp-desk-serving-time">
+                    <Clock3 size={14} />
+                    <span>{t?.createdAt ? `Joined ${elapsedLabel(now - t.createdAt)} ago` : "Join time unavailable"}</span>
+                  </div>
+                </section>
+
+                <section className="qp-desk-details-panel">
+                  <div className="qp-desk-details-heading">
+                    <span>Queue Details</span>
+                    {timerLabel ? <span className="qp-mono qp-desk-timer">{timerLabel}</span> : null}
+                  </div>
+
+                  <div className="qp-desk-details-list">
+                    <div className="qp-desk-detail-row">
+                      <UserRound size={16} />
+                      <span className="qp-desk-detail-label">Name</span>
+                      <span className="qp-desk-detail-value truncate">{name || "—"}</span>
+                    </div>
+                    <div className="qp-desk-detail-row">
+                      <Clock3 size={16} />
+                      <span className="qp-desk-detail-label">Joined</span>
+                      <span className="qp-desk-detail-value qp-mono truncate" title={t?.createdAt ? formatJoinedDateTime(t.createdAt) : undefined}>
+                        {t?.createdAt ? formatJoinedDateTime(t.createdAt) : "—"}
+                      </span>
+                    </div>
+                    <div className="qp-desk-detail-row">
+                      <Phone size={16} />
+                      <span className="qp-desk-detail-label">Phone</span>
+                      <span className="qp-desk-detail-value qp-mono truncate">{phone || "—"}</span>
+                      {phone ? <a className="qp-desk-phone-action" href={`tel:${phone}`} aria-label={`Call ${phone}`}><Phone size={14} /></a> : null}
+                    </div>
+                    <div className="qp-desk-detail-row">
+                      <Layers3 size={16} />
+                      <span className="qp-desk-detail-label">{serviceWord}</span>
+                      <span className="qp-desk-detail-value truncate">{svcId ? serviceName(svcId) : "—"}</span>
+                    </div>
+                  </div>
+
+                  {renderDeskActions()}
+                </section>
+              </div>
+            </div>
+          ) : isOnBreak ? (
+            <div
+              className="qp-desk-ticket-frame qp-desk-ticket-frame--break"
+              style={{
+                "--qp-desk-accent": surfaceTheme.accentColor,
+                "--qp-desk-status-accent": primaryBg,
+                "--qp-desk-details-bg": cardBackground,
+                "--qp-desk-details-text": surfaceTheme.fontColor,
+                "--qp-desk-details-muted": mutedColor,
+                "--qp-desk-details-faint": faintColor,
+                "--qp-desk-details-border": withAlpha(surfaceTheme.borderColor, "88"),
+                "--qp-desk-details-action-bg": cardBackground,
+                "--qp-desk-frame-bg": cardBackground,
+                "--qp-desk-frame-shadow": cardShadow,
+                "--qp-ticket-side-bg": primaryBg,
+                "--qp-desk-radius": `${surfaceTheme.radius * 1.2}px`,
+                borderColor: "transparent",
+              }}
+            >
+              <div className="qp-desk-ticket-main">
+                <section className="qp-desk-serving-panel qp-desk-serving-panel--break">
+                  {hideInCardCounterStatus ? null : (
+                    <div className="qp-desk-serving-header" onClick={(e) => e.stopPropagation()}>
+                      {renderDeskStatusButton(true)}
+                    </div>
+                  )}
+
+                  <div className="qp-desk-serving-caption">
+                    <span className="qp-desk-caption-icon"><Coffee size={15} /></span>
+                    <span>On Break</span>
+                  </div>
+
+                  <div className="qp-desk-break-title">Break</div>
+                  <div className="qp-desk-serving-name truncate">{d.name}</div>
+                  <div className="qp-desk-service-pill truncate">Counter paused</div>
+
+                  <div className="qp-desk-serving-time">
+                    <Clock3 size={14} />
+                    <span>Ready when you are</span>
+                  </div>
+                </section>
+
+                <section className="qp-desk-details-panel">
+                  <div className="qp-desk-details-heading">
+                    <span>Queue Details</span>
+                  </div>
+                  <div className="flex min-h-[8rem] flex-col justify-center gap-2 text-sm" style={{ color: mutedColor }}>
+                    <span className="font-medium" style={{ color: surfaceTheme.fontColor }}>Counter is on break</span>
+                    <span>No tickets will be called until break ends.</span>
+                  </div>
+                  {renderDeskActions()}
+                </section>
+              </div>
+            </div>
+          ) : (
+            <div
+              className="qp-desk-ticket-frame"
+              style={{
+                background: cardBackground,
+                "--qp-desk-frame-bg": cardBackground,
+                "--qp-desk-frame-shadow": cardShadow,
+                borderColor: "transparent",
+                borderRadius: surfaceTheme.radius * 1.2,
+              }}
+            >
+              <div className="flex w-full flex-col items-center gap-0.5 px-4 py-4">
+                <SnoozingCat />
+                <span className="text-[10px] tracking-wide" style={{ color: faintColor }}>
+                  No one in queue
+                </span>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {!t && !isOnBreak ? renderDeskActions() : null}
+      </div>
+
+      {statusOpen && typeof document !== "undefined" ? createPortal(
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.6)" }} onClick={() => setStatusOpen(false)}>
+          <div
+            className="qp-modal w-full max-w-sm p-5"
+            style={{ background: surfaceTheme.bgColor, borderRadius: surfaceTheme.radius * 1.4, boxShadow: "0 22px 60px rgba(0,0,0,0.45)" }}
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="mb-4">
+              <h3 className="text-lg font-semibold" style={{ color: surfaceTheme.fontColor }}>
+                {d.name}
+              </h3>
+              <div className="mt-2 inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium" style={{ color: availability.dot, background: `${availability.dot}24` }}>
+                {availability.label}
+              </div>
+            </div>
+
+            <div className="grid gap-2">
+              <button
+                type="button"
+                onClick={() => setDraftStatusMode("always_open")}
+                className="qp-focusable flex w-full items-center justify-between rounded-md border px-3 py-2 text-left text-sm transition-colors hover:bg-white/5"
+                style={{ borderColor: surfaceTheme.borderColor, color: surfaceTheme.fontColor, borderRadius: surfaceTheme.radius }}
+              >
+                <span className="inline-flex items-center gap-2">
+                  <Unlock size={15} style={{ color: C.teal }} />
+                  Open
+                </span>
+                {draftStatusMode === "always_open" ? <Check size={15} style={{ color: C.teal }} /> : null}
+              </button>
+              <button
+                type="button"
+                onClick={() => setDraftStatusMode("always_closed")}
+                className="qp-focusable flex w-full items-center justify-between rounded-md border px-3 py-2 text-left text-sm transition-colors hover:bg-white/5"
+                style={{ borderColor: surfaceTheme.borderColor, color: surfaceTheme.fontColor, borderRadius: surfaceTheme.radius }}
+              >
+                <span className="inline-flex items-center gap-2">
+                  <Lock size={15} style={{ color: C.coral }} />
+                  Closed
+                </span>
+                {draftStatusMode === "always_closed" ? <Check size={15} style={{ color: C.coral }} /> : null}
+              </button>
+              <button
+                type="button"
+                onClick={() => setDraftStatusMode("scheduled")}
+                className="qp-focusable w-full rounded-md border px-3 py-2 text-left text-sm transition-colors hover:bg-white/5"
+                style={{ borderColor: surfaceTheme.borderColor, color: surfaceTheme.fontColor, borderRadius: surfaceTheme.radius }}
+              >
+                <span className="flex items-center justify-between gap-3">
+                  <span className="inline-flex items-center gap-2">
+                    <CalendarDays size={15} style={{ color: C.amber }} />
+                    Scheduled
+                  </span>
+                  {draftStatusMode === "scheduled" ? <Check size={15} style={{ color: C.amber }} /> : null}
+                </span>
+                <span
+                  className="block overflow-hidden transition-all duration-300 ease-out"
+                  style={{
+                    maxHeight: draftStatusMode === "scheduled" ? 190 : 0,
+                    opacity: draftStatusMode === "scheduled" ? 1 : 0,
+                    marginTop: draftStatusMode === "scheduled" ? 10 : 0,
+                  }}
+                >
+                  <span className="grid gap-1.5">
+                    {scheduleRows.map((row) => {
+                      const isCurrentDay = row.value === currentScheduleDay;
+                      const rowColor = isCurrentDay ? currentScheduleColor : faintColor;
+
+                      return (
+                        <span key={row.value} className="grid grid-cols-[2.25rem_minmax(0,1fr)] items-center gap-3 text-xs">
+                          <span className="font-semibold" style={{ color: rowColor }}>
+                            {row.label}
+                          </span>
+                          <span className="qp-mono truncate" style={{ color: rowColor }}>
+                            {row.time}
+                          </span>
+                        </span>
+                      );
+                    })}
+                  </span>
+                </span>
+              </button>
+            </div>
+
+            <div className="mt-4 flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setStatusOpen(false)}
+                className="qp-focusable rounded-md px-3 py-2 text-xs"
+                style={{ background: controlBackground, color: mutedColor, borderRadius: surfaceTheme.radius }}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => updateDeskAvailability(draftStatusMode)}
+                className="qp-focusable rounded-md px-3 py-2 text-xs font-medium"
+                style={{ background: surfaceTheme.accentColor, color: C.textLight, borderRadius: surfaceTheme.radius }}
+              >
+                Save
+              </button>
+            </div>
+          </div>
+        </div>,
+        document.body
+      ) : null}
+    </div>
+  );
+}
