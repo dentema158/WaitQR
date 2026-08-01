@@ -1,6 +1,7 @@
 import { Children, useEffect, useRef, useState } from "react";
 import {
   Bell,
+  Check,
   ChevronDown,
   Clock,
   Minus,
@@ -42,6 +43,177 @@ function isLightHex(hex) {
   const g = parseInt(hex.slice(3, 5), 16);
   const b = parseInt(hex.slice(5, 7), 16);
   return (r * 299 + g * 587 + b * 114) / 1000 > 180;
+}
+
+function hexToRgb(hex) {
+  const color = normalizeHexColor(hex);
+  if (!color) return null;
+  return {
+    r: parseInt(color.slice(1, 3), 16),
+    g: parseInt(color.slice(3, 5), 16),
+    b: parseInt(color.slice(5, 7), 16),
+  };
+}
+
+function rgbToHex({ r, g, b }) {
+  return `#${[r, g, b].map((value) => Math.round(value).toString(16).padStart(2, "0")).join("").toUpperCase()}`;
+}
+
+function mixHex(from, to, amount) {
+  const a = hexToRgb(from);
+  const b = hexToRgb(to);
+  if (!a || !b) return normalizeHexColor(from) || normalizeHexColor(to) || "#2563EB";
+  return rgbToHex({
+    r: a.r + (b.r - a.r) * amount,
+    g: a.g + (b.g - a.g) * amount,
+    b: a.b + (b.b - a.b) * amount,
+  });
+}
+
+function rgbToHsl({ r, g, b }) {
+  const rn = r / 255;
+  const gn = g / 255;
+  const bn = b / 255;
+  const max = Math.max(rn, gn, bn);
+  const min = Math.min(rn, gn, bn);
+  const lightness = (max + min) / 2;
+
+  if (max === min) return { h: 0, s: 0, l: lightness };
+
+  const delta = max - min;
+  const saturation = lightness > 0.5
+    ? delta / (2 - max - min)
+    : delta / (max + min);
+  let hue = 0;
+
+  if (max === rn) hue = (gn - bn) / delta + (gn < bn ? 6 : 0);
+  else if (max === gn) hue = (bn - rn) / delta + 2;
+  else hue = (rn - gn) / delta + 4;
+
+  return { h: hue / 6, s: saturation, l: lightness };
+}
+
+function hslToHex({ h, s, l }) {
+  if (s === 0) {
+    const value = l * 255;
+    return rgbToHex({ r: value, g: value, b: value });
+  }
+
+  const hueToRgb = (p, q, t) => {
+    let nextT = t;
+    if (nextT < 0) nextT += 1;
+    if (nextT > 1) nextT -= 1;
+    if (nextT < 1 / 6) return p + (q - p) * 6 * nextT;
+    if (nextT < 1 / 2) return q;
+    if (nextT < 2 / 3) return p + (q - p) * (2 / 3 - nextT) * 6;
+    return p;
+  };
+  const q = l < 0.5 ? l * (1 + s) : l + s - l * s;
+  const p = 2 * l - q;
+
+  return rgbToHex({
+    r: hueToRgb(p, q, h + 1 / 3) * 255,
+    g: hueToRgb(p, q, h) * 255,
+    b: hueToRgb(p, q, h - 1 / 3) * 255,
+  });
+}
+
+function shiftHue(hex, degrees, saturationScale = 1, lightnessShift = 0) {
+  const hsl = rgbToHsl(hexToRgb(hex));
+  return hslToHex({
+    h: (hsl.h + degrees / 360 + 1) % 1,
+    s: Math.max(0, Math.min(1, hsl.s * saturationScale)),
+    l: Math.max(0, Math.min(1, hsl.l + lightnessShift)),
+  });
+}
+
+function contrastColorForBackground(bgColor, accentColor, mode) {
+  const bg = normalizeHexColor(bgColor) || (mode === "Light" ? "#ECF2FB" : "#060B17");
+  const accent = normalizeHexColor(accentColor) || "#2563EB";
+  const lightBg = isLightHex(bg);
+  const base = lightBg ? "#0F172A" : "#F8FAFC";
+  const secondary = lightBg ? "#1F2937" : "#DBE3F0";
+  const bgHsl = rgbToHsl(hexToRgb(bg));
+  const accentHsl = rgbToHsl(hexToRgb(accent));
+
+  return [
+    mixHex(base, accent, lightBg ? 0.055 : 0.045),
+    mixHex(secondary, accent, lightBg ? 0.09 : 0.065),
+    mixHex(lightBg ? "#334155" : "#CBD5E1", accent, lightBg ? 0.12 : 0.08),
+    lightBg ? "#111827" : "#F2EFE7",
+    hslToHex({ h: accentHsl.h, s: Math.min(accentHsl.s * 0.28, lightBg ? 0.18 : 0.12), l: lightBg ? 0.16 : 0.88 }),
+    hslToHex({ h: bgHsl.h, s: Math.min(Math.max(bgHsl.s * 0.7, 0.08), lightBg ? 0.2 : 0.14), l: lightBg ? 0.2 : 0.84 }),
+    mixHex(lightBg ? "#020617" : "#FFFFFF", accent, lightBg ? 0.09 : 0.05),
+    mixHex(lightBg ? "#374151" : "#E2E8F0", accent, lightBg ? 0.14 : 0.1),
+    shiftHue(mixHex(base, accent, lightBg ? 0.08 : 0.06), 12, 1.05, 0),
+    shiftHue(mixHex(base, accent, lightBg ? 0.08 : 0.06), -12, 1.05, 0),
+    hslToHex({ h: accentHsl.h, s: Math.min(accentHsl.s * 0.18, lightBg ? 0.14 : 0.1), l: lightBg ? 0.28 : 0.76 }),
+  ];
+}
+
+function borderColorsForBackground(bgColor, accentColor, mode) {
+  const bg = normalizeHexColor(bgColor) || (mode === "Light" ? "#ECF2FB" : "#060B17");
+  const accent = normalizeHexColor(accentColor) || "#2563EB";
+  const bgHsl = rgbToHsl(hexToRgb(bg));
+  const accentHsl = rgbToHsl(hexToRgb(accent));
+  const lightBg = isLightHex(bg);
+  const lightnessSteps = lightBg
+    ? [Math.max(0.72, bgHsl.l - 0.12), Math.max(0.66, bgHsl.l - 0.18), 0.86, 0.78]
+    : [Math.min(0.24, bgHsl.l + 0.08), Math.min(0.3, bgHsl.l + 0.13), 0.12, 0.2];
+
+  return [
+    hslToHex({ h: accentHsl.h, s: Math.min(accentHsl.s * 0.34, lightBg ? 0.18 : 0.1), l: lightnessSteps[0] }),
+    hslToHex({ h: bgHsl.h, s: Math.min(Math.max(bgHsl.s, 0.08), lightBg ? 0.2 : 0.14), l: lightnessSteps[1] }),
+    mixHex(lightBg ? "#CBD5E1" : "#334155", accent, lightBg ? 0.2 : 0.18),
+    hslToHex({ h: accentHsl.h, s: Math.min(accentHsl.s * 0.24, lightBg ? 0.14 : 0.08), l: lightnessSteps[3] }),
+    mixHex(lightBg ? "#E2E8F0" : "#1E293B", bg, lightBg ? 0.28 : 0.2),
+    mixHex(lightBg ? "#D1D5DB" : "#475569", accent, lightBg ? 0.16 : 0.14),
+    hslToHex({ h: bgHsl.h, s: Math.min(Math.max(bgHsl.s * 0.7, 0.06), lightBg ? 0.16 : 0.12), l: lightBg ? 0.82 : 0.18 }),
+    hslToHex({ h: accentHsl.h, s: Math.min(accentHsl.s * 0.2, lightBg ? 0.12 : 0.08), l: lightBg ? 0.9 : 0.26 }),
+    mixHex(lightBg ? "#F1F5F9" : "#0F172A", accent, lightBg ? 0.22 : 0.22),
+    hslToHex({ h: (accentHsl.h + 0.04) % 1, s: Math.min(accentHsl.s * 0.22, lightBg ? 0.14 : 0.08), l: lightBg ? 0.84 : 0.22 }),
+    hslToHex({ h: (accentHsl.h + 0.96) % 1, s: Math.min(accentHsl.s * 0.22, lightBg ? 0.14 : 0.08), l: lightBg ? 0.8 : 0.16 }),
+  ];
+}
+
+function derivedPalettes({ accentColor, bgColor, mode }) {
+  const accent = normalizeHexColor(accentColor) || "#2563EB";
+  const accentHsl = rgbToHsl(hexToRgb(accent));
+  const lightMode = mode === "Light";
+  const bgBase = lightMode ? "#ECF2FB" : "#060B17";
+  const backgroundColors = lightMode
+    ? [
+      mixHex(bgBase, accent, 0.055),
+      mixHex("#FFFFFF", accent, 0.075),
+      mixHex("#F8FAFC", accent, 0.11),
+      hslToHex({ h: accentHsl.h, s: Math.min(accentHsl.s * 0.18, 0.14), l: 0.95 }),
+      mixHex("#F1F5F9", accent, 0.14),
+      shiftHue(mixHex("#FFFFFF", accent, 0.1), -10, 1.05, -0.015),
+      shiftHue(mixHex("#F8FAFC", accent, 0.14), 10, 1.05, -0.01),
+      hslToHex({ h: accentHsl.h, s: Math.min(accentHsl.s * 0.24, 0.18), l: 0.9 }),
+      mixHex("#E2E8F0", accent, 0.18),
+      mixHex("#FDFDFD", shiftHue(accent, 30, 0.8, 0.02), 0.1),
+      mixHex("#FDFDFD", shiftHue(accent, -30, 0.8, 0.02), 0.1),
+    ]
+    : [
+      mixHex(bgBase, accent, 0.055),
+      mixHex("#020617", accent, 0.09),
+      mixHex("#0F172A", accent, 0.14),
+      hslToHex({ h: accentHsl.h, s: Math.min(accentHsl.s * 0.28, 0.18), l: 0.1 }),
+      mixHex("#111827", accent, 0.18),
+      shiftHue(mixHex("#020617", accent, 0.12), -10, 1.05, 0.01),
+      shiftHue(mixHex("#0B1120", accent, 0.16), 10, 1.05, 0.01),
+      hslToHex({ h: accentHsl.h, s: Math.min(accentHsl.s * 0.34, 0.2), l: 0.14 }),
+      mixHex("#1E293B", accent, 0.16),
+      mixHex("#030712", shiftHue(accent, 30, 0.8, 0), 0.14),
+      mixHex("#030712", shiftHue(accent, -30, 0.8, 0), 0.14),
+    ];
+
+  return {
+    bgColor: backgroundColors,
+    fontColor: contrastColorForBackground(bgColor || backgroundColors[0], accent, mode),
+    borderColor: borderColorsForBackground(bgColor || backgroundColors[0], accent, mode),
+  };
 }
 
 function focusHandlers(accent, restoreBorderColor) {
@@ -176,25 +348,45 @@ function Field({ label, hint, children, fontColor, inline }) {
   );
 }
 
-function ColorSwatchInput({ label, hint, value, defaultValue, onChange, fontColor, radius, borderColor }) {
+function ColorSwatchInput({ label, hint, value, defaultValue, presetColors = [], suggestedColors = [], onChange, fontColor, radius, borderColor }) {
   const isNarrow = useIsNarrow();
   const compactRadius = Math.max(10, Math.min(14, radius));
   const defaultColor = normalizeHexColor(defaultValue) || "#2563EB";
   const selectedColor = normalizeHexColor(value) || defaultColor;
   const [draft, setDraft] = useState(() => selectedColor);
   const [open, setOpen] = useState(false);
+  const [pendingColor, setPendingColor] = useState(null);
   const pickerRef = useRef(null);
+  const chromeRef = useRef(null);
+  const visibleColor = pendingColor || selectedColor;
+  const visibleNativeColor = visibleColor.toLowerCase();
   const normalizedDraft = normalizeHexColor(draft);
   const hasInvalidDraft = draft.length > 1 && !normalizedDraft;
+  const panelMixColor = isLightHex(fontColor) ? "white" : "black";
+  const panelBackground = `color-mix(in srgb, var(--surface-bg, var(--field-bg)) 88%, ${panelMixColor} 12%)`;
+  const chrome = open && chromeRef.current
+    ? chromeRef.current
+    : { fontColor, borderColor, panelBackground };
 
   useEffect(() => {
+    if (pendingColor && pendingColor !== selectedColor) return;
     setDraft(selectedColor);
-  }, [selectedColor]);
+    setPendingColor(null);
+  }, [pendingColor, selectedColor]);
+
+  useEffect(() => {
+    if (!pendingColor) return undefined;
+    const timeout = window.setTimeout(() => setPendingColor(null), 900);
+    return () => window.clearTimeout(timeout);
+  }, [pendingColor]);
 
   useEffect(() => {
     if (!open) return undefined;
     const handlePointerDown = (event) => {
-      if (pickerRef.current && !pickerRef.current.contains(event.target)) setOpen(false);
+      if (pickerRef.current && !pickerRef.current.contains(event.target)) {
+        chromeRef.current = null;
+        setOpen(false);
+      }
     };
     document.addEventListener("mousedown", handlePointerDown);
     return () => document.removeEventListener("mousedown", handlePointerDown);
@@ -204,31 +396,47 @@ function ColorSwatchInput({ label, hint, value, defaultValue, onChange, fontColo
     const nextDraft = formatHexDraft(nextValue);
     const nextColor = normalizeHexColor(nextDraft);
     setDraft(nextDraft);
-    if (nextColor) onChange(nextColor);
+    if (nextColor && nextColor !== selectedColor) applyColor(nextColor);
+  };
+
+  const applyColor = (nextColor) => {
+    if (!nextColor || nextColor === selectedColor) return;
+    setPendingColor(nextColor);
+    setDraft(nextColor);
+    onChange(nextColor);
+  };
+
+  const openPicker = () => {
+    chromeRef.current = { fontColor, borderColor, panelBackground };
+    setOpen(true);
+  };
+
+  const closePicker = () => {
+    setOpen(false);
+    chromeRef.current = null;
+  };
+
+  const togglePicker = () => {
+    if (open) {
+      closePicker();
+      return;
+    }
+    openPicker();
   };
 
   const handleTextBlur = () => {
     const nextColor = normalizeHexColor(draft);
     if (nextColor) {
       setDraft(nextColor);
-      onChange(nextColor);
+      applyColor(nextColor);
     } else {
       setDraft(selectedColor);
     }
   };
   const paletteColors = [
     defaultColor,
-    "#0EA5E9",
-    "#14B8A6",
-    "#22C55E",
-    "#84CC16",
-    "#E8A33D",
-    "#F97316",
-    "#E2614F",
-    "#EC4899",
-    "#8B5CF6",
-    "#6366F1",
-    "#64748B",
+    ...presetColors.map(normalizeHexColor),
+    ...suggestedColors.map(normalizeHexColor),
   ].filter((color, index, colors) => color && colors.indexOf(color) === index).slice(0, 12);
 
   return (
@@ -250,54 +458,57 @@ function ColorSwatchInput({ label, hint, value, defaultValue, onChange, fontColo
         <div ref={pickerRef} className="relative shrink-0">
           <button
             type="button"
-            onClick={() => setOpen((current) => !current)}
+            onClick={togglePicker}
             className="relative h-9 w-9 overflow-hidden border outline-none transition-transform active:scale-95"
             style={{
               borderRadius: compactRadius,
-              borderColor: open ? selectedColor : borderColor,
-              backgroundColor: selectedColor,
-              boxShadow: open ? `0 0 0 3px ${withAlpha(selectedColor, "33")}` : "none",
+              borderColor: open ? visibleColor : borderColor,
+              backgroundColor: visibleColor,
+              boxShadow: open ? `0 0 0 3px ${withAlpha(visibleColor, "33")}` : "none",
             }}
             aria-label={`${label} picker`}
             aria-expanded={open}
           >
-            <span aria-hidden="true" className="absolute inset-0" style={{ backgroundColor: selectedColor }} />
+            <span aria-hidden="true" className="absolute inset-0" style={{ backgroundColor: visibleColor }} />
           </button>
           {open && (
             <div
               className="absolute left-0 top-11 z-[130] border p-3 shadow-2xl"
               style={{
                 width: isNarrow ? "min(16rem, calc(100vw - 2rem))" : "16rem",
-                color: fontColor,
-                borderColor,
+                color: chrome.fontColor,
+                borderColor: chrome.borderColor,
                 borderRadius: compactRadius,
-                background: `color-mix(in srgb, var(--surface-bg, var(--field-bg)) 88%, ${isLightHex(fontColor) ? "white" : "black"} 12%)`,
+                background: chrome.panelBackground,
               }}
             >
               <div className="flex items-start gap-3">
                 <label
                   className="relative h-16 w-16 shrink-0 cursor-pointer overflow-hidden border"
-                  style={{ borderRadius: compactRadius, borderColor, backgroundColor: selectedColor }}
+                  style={{ borderRadius: compactRadius, borderColor: chrome.borderColor, backgroundColor: visibleColor }}
                   title="Open system picker"
                 >
-                  <span aria-hidden="true" className="absolute inset-0" style={{ backgroundColor: selectedColor }} />
+                  <span aria-hidden="true" className="absolute inset-0" style={{ backgroundColor: visibleColor }} />
                   <input
                     type="color"
-                    value={selectedColor}
-                    onChange={(e) => onChange(normalizeHexColor(e.target.value) || e.target.value)}
+                    value={visibleNativeColor}
+                    onChange={(e) => {
+                      const nextColor = normalizeHexColor(e.target.value);
+                      applyColor(nextColor);
+                    }}
                     className="absolute inset-0 h-full w-full cursor-pointer border-none p-0 opacity-0"
                   />
                 </label>
                 <div className="min-w-0 flex-1">
                   <div className="mb-1 flex items-center justify-between gap-2">
-                    <span className="text-[11px] font-medium uppercase tracking-wider" style={{ color: withAlpha(fontColor, "99") }}>
+                    <span className="text-[11px] font-medium uppercase tracking-wider" style={{ color: withAlpha(chrome.fontColor, "99") }}>
                       Hex
                     </span>
                     <button
                       type="button"
-                      onClick={() => setOpen(false)}
+                      onClick={closePicker}
                       className="flex h-6 w-6 items-center justify-center rounded-full transition-colors hover:bg-white/5"
-                      style={{ color: withAlpha(fontColor, "99") }}
+                      style={{ color: withAlpha(chrome.fontColor, "99") }}
                       aria-label="Close picker"
                     >
                       <X size={13} />
@@ -307,14 +518,13 @@ function ColorSwatchInput({ label, hint, value, defaultValue, onChange, fontColo
                     value={draft}
                     onChange={(e) => handleTextChange(e.target.value)}
                     onBlur={handleTextBlur}
-                    autoFocus
                     inputMode="text"
                     spellCheck={false}
                     aria-invalid={hasInvalidDraft}
                     style={{
-                      color: fontColor,
+                      color: chrome.fontColor,
                       borderRadius: compactRadius,
-                      borderColor: hasInvalidDraft ? "#f87171" : borderColor,
+                      borderColor: hasInvalidDraft ? "#f87171" : chrome.borderColor,
                       backgroundColor: "var(--field-bg)",
                       fontVariantNumeric: "tabular-nums",
                     }}
@@ -327,17 +537,30 @@ function ColorSwatchInput({ label, hint, value, defaultValue, onChange, fontColo
                         type="button"
                         onClick={() => {
                           setDraft(color);
-                          onChange(color);
+                          applyColor(color);
                         }}
                         className="relative aspect-square w-full border-2 transition-transform hover:scale-105"
                         style={{
                           backgroundColor: color,
-                          borderColor: color === selectedColor ? fontColor : "transparent",
+                          borderColor: "transparent",
                           borderRadius: 5,
                         }}
                         aria-label={color === defaultColor ? `Default ${color}` : color}
                         title={color === defaultColor ? `Default ${color}` : color}
-                      />
+                      >
+                        {color === visibleColor ? (
+                          <span
+                            className="absolute inset-0 flex items-center justify-center"
+                            style={{ color: isLightHex(color) ? "#111827" : "#FFFFFF" }}
+                          >
+                            {pendingColor === color && selectedColor !== color ? (
+                              <span className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                            ) : (
+                              <Check size={16} strokeWidth={3} />
+                            )}
+                          </span>
+                        ) : null}
+                      </button>
                     ))}
                   </div>
                 </div>
@@ -350,8 +573,8 @@ function ColorSwatchInput({ label, hint, value, defaultValue, onChange, fontColo
           onChange={(e) => handleTextChange(e.target.value)}
           onBlur={handleTextBlur}
           onFocus={(e) => {
-            e.target.style.borderColor = selectedColor;
-            e.target.style.boxShadow = `0 0 0 3px ${withAlpha(selectedColor, "33")}`;
+            e.target.style.borderColor = visibleColor;
+            e.target.style.boxShadow = `0 0 0 3px ${withAlpha(visibleColor, "33")}`;
           }}
           inputMode="text"
           spellCheck={false}
@@ -508,11 +731,27 @@ function SectionCard({ icon: Icon, iconBg, title, children, fontColor, borderCol
   );
 }
 
+const ACCENT_PRESET_COLORS = [
+  "#2563EB",
+  "#0EA5E9",
+  "#14B8A6",
+  "#22C55E",
+  "#84CC16",
+  "#E8A33D",
+  "#F97316",
+  "#E2614F",
+  "#EC4899",
+  "#8B5CF6",
+  "#6366F1",
+  "#64748B",
+];
+
 export function AdminSettingsContent({ s, theme, defaultAppearance }) {
   const { accentColor, fontColor, borderColor, radius, logoUrl } = theme;
   const cardProps = { fontColor, borderColor, radius };
   const defaultMode = theme.themeMode === "Light" ? "Light" : "Dark";
   const defaultThemeColors = defaultAppearance?.themeColors?.[defaultMode] || defaultAppearance || {};
+  const suggestedPalettes = derivedPalettes({ accentColor, bgColor: theme.bgColor, mode: defaultMode });
 
   return (
     <div className="space-y-4 px-2.5 py-2.5 sm:space-y-6 sm:px-6 sm:py-6 md:pl-10 md:pr-6">
@@ -593,10 +832,10 @@ export function AdminSettingsContent({ s, theme, defaultAppearance }) {
           borderColor={borderColor}
           radius={radius}
         />
-        <ColorSwatchInput label="Accent Color" hint="Used for active states, toggles, and the save button" value={accentColor} defaultValue={defaultAppearance?.accentColor} onChange={theme.setAccentColor} fontColor={fontColor} borderColor={borderColor} radius={radius} />
-        <ColorSwatchInput label="Background Color" hint="Base background color for the dashboard" value={theme.bgColor} defaultValue={defaultThemeColors.bgColor} onChange={theme.setBgColor} fontColor={fontColor} borderColor={borderColor} radius={radius} />
-        <ColorSwatchInput label="Font Color" hint="Text color used across labels, headings, and inputs" value={fontColor} defaultValue={defaultThemeColors.fontColor} onChange={theme.setFontColor} fontColor={fontColor} borderColor={borderColor} radius={radius} />
-        <ColorSwatchInput label="Border Color" hint="Applied to cards, inputs, and divider lines" value={borderColor} defaultValue={defaultThemeColors.borderColor} onChange={theme.setBorderColor} fontColor={fontColor} borderColor={borderColor} radius={radius} />
+        <ColorSwatchInput label="Accent Color" hint="Used for active states, toggles, and the save button" value={accentColor} defaultValue={defaultAppearance?.accentColor} presetColors={ACCENT_PRESET_COLORS} onChange={theme.setAccentColor} fontColor={fontColor} borderColor={borderColor} radius={radius} />
+        <ColorSwatchInput label="Background Color" hint="Base background color for the dashboard" value={theme.bgColor} defaultValue={defaultThemeColors.bgColor} suggestedColors={suggestedPalettes.bgColor} onChange={theme.setBgColor} fontColor={fontColor} borderColor={borderColor} radius={radius} />
+        <ColorSwatchInput label="Font Color" hint="Text color used across labels, headings, and inputs" value={fontColor} defaultValue={defaultThemeColors.fontColor} suggestedColors={suggestedPalettes.fontColor} onChange={theme.setFontColor} fontColor={fontColor} borderColor={borderColor} radius={radius} />
+        <ColorSwatchInput label="Border Color" hint="Applied to cards, inputs, and divider lines" value={borderColor} defaultValue={defaultThemeColors.borderColor} suggestedColors={suggestedPalettes.borderColor} onChange={theme.setBorderColor} fontColor={fontColor} borderColor={borderColor} radius={radius} />
         <RadiusControl value={radius} onChange={theme.setRadius} fontColor={fontColor} borderColor={borderColor} />
       </SectionCard>
 
