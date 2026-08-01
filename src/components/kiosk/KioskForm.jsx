@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef } from "react";
-import { ArrowLeft, ArrowRight, Check, Ticket } from "lucide-react";
+import { ArrowLeft, ArrowRight, Check } from "lucide-react";
 import { C } from "../../lib/theme";
 import { getServiceAvailability } from "../../lib/serviceAvailability";
 
@@ -26,6 +26,8 @@ export function KioskForm({
   setForm,
   formError,
   setFormError,
+  formErrors,
+  setFormErrors,
   desks,
   services,
   serviceWord,
@@ -46,6 +48,7 @@ export function KioskForm({
   const fieldBackground = appearance.bgColor;
   const panelBackground = appearance.bgColor;
   const mutedText = withAlpha(appearance.fontColor, "99");
+  const phoneDigits = form.phone.trim().replace(/\D/g, "");
   const fieldStyle = {
     background: fieldBackground,
     border: `1px solid ${appearance.borderColor}`,
@@ -53,6 +56,13 @@ export function KioskForm({
     borderRadius: appearance.radius,
     boxShadow: "inset 0 1px 0 rgba(255,255,255,0.04)",
   };
+  const nameInvalid = Boolean(formErrors?.name);
+  const phoneInvalid = Boolean(formErrors?.phone);
+  const phoneErrorText = phoneInvalid
+    ? phoneDigits
+      ? "Enter a valid mobile number."
+      : "Mobile number is required."
+    : "";
   const focusHandlers = {
     onFocus: (event) => {
       event.target.style.borderColor = appearance.accentColor;
@@ -128,8 +138,8 @@ export function KioskForm({
         className="qp-focusable inline-flex min-h-[51px] items-center justify-center gap-2 px-4 text-sm font-semibold transition-opacity"
         style={{ background: appearance.fontColor, color: appearance.bgColor, borderRadius: appearance.radius, opacity: issuePending ? 0.6 : 1 }}
       >
-        <Ticket size={16} />
         {issuePending ? "Saving..." : "Join queue"}
+        <ArrowRight size={15} />
       </button>
     </div>
   );
@@ -168,32 +178,50 @@ export function KioskForm({
         {issueStep === 1 && (
           <>
             <div className="grid gap-3">
-              <input
-                ref={nameInputRef}
-                type="text"
-                value={form.name}
-                onChange={(e) => {
-                  setForm((f) => ({ ...f, name: e.target.value }));
-                  if (formError) setFormError?.("");
-                }}
-                placeholder="Name"
-                className="w-full px-4 py-3.5 text-[15px] font-medium outline-none transition-colors"
-                style={fieldStyle}
-                {...focusHandlers}
-              />
-              <input
-                type="tel"
-                inputMode="tel"
-                value={form.phone}
-                onChange={(e) => {
-                  setForm((f) => ({ ...f, phone: e.target.value }));
-                  if (formError) setFormError?.("");
-                }}
-                placeholder="Phone"
-                className="w-full px-4 py-3.5 text-[15px] font-medium outline-none transition-colors"
-                style={fieldStyle}
-                {...focusHandlers}
-              />
+              <div>
+                <input
+                  ref={nameInputRef}
+                  type="text"
+                  value={form.name}
+                  onChange={(e) => {
+                    setForm((f) => ({ ...f, name: e.target.value }));
+                    if (nameInvalid) setFormErrors?.((errors) => ({ ...errors, name: false }));
+                    if (formError) setFormError?.("");
+                  }}
+                  placeholder="Name"
+                  className="w-full px-4 py-3.5 text-[15px] font-medium outline-none transition-colors"
+                  style={fieldStyle}
+                  aria-invalid={nameInvalid}
+                  {...focusHandlers}
+                />
+                {nameInvalid ? (
+                  <div className="mt-1.5 text-xs font-medium leading-snug" style={{ color: C.coral }}>
+                    Name is required.
+                  </div>
+                ) : null}
+              </div>
+              <div>
+                <input
+                  type="tel"
+                  inputMode="tel"
+                  value={form.phone}
+                  onChange={(e) => {
+                    setForm((f) => ({ ...f, phone: e.target.value }));
+                    if (phoneInvalid) setFormErrors?.((errors) => ({ ...errors, phone: false }));
+                    if (formError) setFormError?.("");
+                  }}
+                  placeholder="Phone"
+                  className="w-full px-4 py-3.5 text-[15px] font-medium outline-none transition-colors"
+                  style={fieldStyle}
+                  aria-invalid={phoneInvalid}
+                  {...focusHandlers}
+                />
+                {phoneErrorText ? (
+                  <div className="mt-1.5 text-xs font-medium leading-snug" style={{ color: C.coral }}>
+                    {phoneErrorText}
+                  </div>
+                ) : null}
+              </div>
             </div>
 
             {directJoin ? (

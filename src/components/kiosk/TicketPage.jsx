@@ -326,7 +326,7 @@ function SubmissionCard({
   const detailsText = appearance.bgColor;
   const detailsMuted = withAlpha(appearance.bgColor, 0.62);
   const detailsFaint = withAlpha(appearance.bgColor, 0.45);
-  const detailsLine = withAlpha(appearance.bgColor, 0.14);
+  const detailsLine = withAlpha(appearance.bgColor, 0.08);
   const detailsPanelStyle = {
     color: detailsText,
     backgroundColor: appearance.fontColor,
@@ -659,20 +659,6 @@ function SubmissionCard({
                   </button>
                   {recallError ? <p className="mt-1 text-[10px]" style={{ color: C.coral }}>{recallError}</p> : null}
                 </div>
-            ) : null}
-            {assignedMember?.about ? (
-              <div
-                className="basis-full overflow-hidden text-[10px] leading-snug"
-                style={{
-                  color: detailsMuted,
-                  display: "-webkit-box",
-                  textOverflow: "ellipsis",
-                  WebkitBoxOrient: "vertical",
-                  WebkitLineClamp: 2,
-                }}
-              >
-                {assignedMember.about}
-              </div>
             ) : null}
           </div>
           <div className="flex items-center gap-3 px-4 py-3.5">

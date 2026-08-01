@@ -28,6 +28,8 @@ export function CreatePage({ ticketIssuer, desks, services, labels, theme }) {
           setForm={ticketIssuer.setForm}
           formError={ticketIssuer.formError}
           setFormError={ticketIssuer.setFormError}
+          formErrors={ticketIssuer.formErrors}
+          setFormErrors={ticketIssuer.setFormErrors}
           desks={desks}
           services={services}
           serviceWord={labels.serviceWord}
