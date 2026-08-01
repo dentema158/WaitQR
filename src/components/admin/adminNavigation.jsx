@@ -19,7 +19,7 @@ export const ADMIN_NAV_ITEMS = [
   { label: "Services", icon: Layers3, path: "/services", page: "services" },
   { label: "Members", icon: Users, path: "/members", page: "members" },
   { label: "Reports", icon: FileText, path: null },
-  { label: "Integrations", icon: Webhook, path: null },
+  { label: "Integrations", icon: Webhook, path: "/integrations", page: "integrations" },
   { label: "Notifications", icon: Bell, path: null },
   { label: "Settings", icon: Settings, path: "/settings", page: "settings" },
 ];
@@ -32,5 +32,6 @@ export const ADMIN_PAGE_META = {
   live: { title: "Live Board", subtitle: "Public queue display view.", icon: Monitor },
   services: { title: "Services", subtitle: "Create service lines and assign them to counters.", icon: Layers3 },
   members: { title: "Members", subtitle: "Manage member profiles and counter access.", icon: Users },
+  integrations: { title: "Integrations", subtitle: "Connect customer messaging and workflow tools.", icon: Webhook },
   settings: { title: "Settings", subtitle: "Configure global preferences and appearance.", icon: Settings },
 };

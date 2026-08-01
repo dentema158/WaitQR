@@ -24,6 +24,7 @@ import { AdminAnalyticsPage } from "./components/admin/analytics/AdminAnalyticsP
 import { AdminCountersPage } from "./components/admin/counters/AdminCountersPage";
 import { AdminServicesPage } from "./components/admin/services/AdminServicesPage";
 import { AdminMembersPage } from "./components/admin/members/AdminMembersPage";
+import { AdminIntegrationsPage } from "./components/admin/integrations/AdminIntegrationsPage";
 import { AdminSettingsPage } from "./components/admin/settings/AdminSettingsPage";
 import { MemberProfilePage, ProfileHeader } from "./components/profile/MemberProfilePage";
 import { ConfirmDialog } from "./components/modals/ConfirmDialog";
@@ -1758,6 +1759,7 @@ export default function App() {
       pathname === "/counters" ||
       pathname === "/services" ||
       pathname === "/members" ||
+      pathname === "/integrations" ||
       pathname === "/settings" ||
       ticketLabelFromPath ||
       memberProfilePathRequested
@@ -1781,6 +1783,7 @@ export default function App() {
       pathname === "/counters" ||
       pathname === "/services" ||
       pathname === "/members" ||
+      pathname === "/integrations" ||
       pathname === "/settings" ||
       ticketLabelFromPath ||
       memberProfilePathRequested
@@ -1815,6 +1818,8 @@ export default function App() {
           ? "services"
         : pathname === "/members"
           ? "members"
+        : pathname === "/integrations"
+          ? "integrations"
         : pathname === "/settings"
           ? "settings"
     : activeDesk || counterDetailPathRequested
@@ -1848,7 +1853,7 @@ export default function App() {
 
   useEffect(() => {
     if (
-      !["counters", "dashboard", "desk", "login", "members", "profile", "services", "settings"].includes(currentPage)
+      !["counters", "dashboard", "desk", "integrations", "login", "members", "profile", "services", "settings"].includes(currentPage)
       || !settingsDirty
       || settingsSaving
       || settingsSavingRef.current
@@ -2492,6 +2497,8 @@ export default function App() {
           settingsSaving={settingsSaving}
           settingsSaveError={settingsSaveError}
         />
+      ) : currentPage === "integrations" ? (
+        <AdminIntegrationsPage theme={adminTheme} />
       ) : currentPage === "settings" ? (
         <AdminSettingsPage
           theme={adminTheme}
