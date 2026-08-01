@@ -1898,8 +1898,10 @@ export default function App() {
     : waitEstimatesByTicketId[String(displayedTicket.id)] || null;
   const mobileTicketThemeColor = currentPage === "ticket" && displayedTicket
     ? ticketStatusThemeColor(displayedTicket.status, ticketAppearanceSettings.accentColor)
+    : currentPage === "create"
+      ? ticketAppearanceSettings.accentColor
     : null;
-  const mobileAppearanceSettings = currentPage === "ticket"
+  const mobileAppearanceSettings = currentPage === "ticket" || currentPage === "create"
     ? ticketAppearanceSettings
     : activeAppearanceSettings;
 
@@ -2297,7 +2299,7 @@ export default function App() {
           <PageFooter color={`${activeAppearanceSettings.fontColor}66`} className="mt-auto" />
         </div>
       ) : currentPage === "create" ? (
-        <CreatePage ticketIssuer={ticketIssuer} desks={desks} services={services} labels={labels} />
+        <CreatePage ticketIssuer={ticketIssuer} desks={desks} services={services} labels={labels} theme={ticketAppearanceSettings} />
       ) : currentPage === "ticket" ? (
         <TicketPage
           ticketLabel={ticketLabelFromPath}
@@ -2392,7 +2394,7 @@ export default function App() {
       )}
 
       {currentPage === "create" ? (
-        <CreatePage ticketIssuer={ticketIssuer} desks={desks} services={services} labels={labels} />
+        <CreatePage ticketIssuer={ticketIssuer} desks={desks} services={services} labels={labels} theme={ticketAppearanceSettings} />
       ) : currentPage === "ticket" ? (
         <TicketPage
           ticketLabel={ticketLabelFromPath}

@@ -23,3 +23,40 @@ export const C = {
   textMuted: "#8B919C",
   textFaint: "#5B6270",
 };
+
+function hexToRgb(hex) {
+  if (typeof hex !== "string" || !/^#?[0-9a-f]{6}$/i.test(hex)) return null;
+  const clean = hex.replace("#", "");
+  return {
+    r: parseInt(clean.slice(0, 2), 16),
+    g: parseInt(clean.slice(2, 4), 16),
+    b: parseInt(clean.slice(4, 6), 16),
+  };
+}
+
+function rgbToHex({ r, g, b }) {
+  return `#${[r, g, b].map((value) => Math.round(value).toString(16).padStart(2, "0")).join("")}`;
+}
+
+function mixHex(from, to, amount) {
+  const a = hexToRgb(from);
+  const b = hexToRgb(to);
+  if (!a || !b) return from;
+  return rgbToHex({
+    r: a.r + (b.r - a.r) * amount,
+    g: a.g + (b.g - a.g) * amount,
+    b: a.b + (b.b - a.b) * amount,
+  });
+}
+
+function isLightHex(hex) {
+  const rgb = hexToRgb(hex);
+  if (!rgb) return false;
+  return (rgb.r * 299 + rgb.g * 587 + rgb.b * 114) / 1000 > 180;
+}
+
+export function pageBackground(theme) {
+  return isLightHex(theme?.bgColor)
+    ? mixHex(mixHex(theme.bgColor, theme.accentColor || theme.bgColor, 0.035), "#94a3b8", 0.08)
+    : mixHex(theme?.bgColor, "#000000", 0.45);
+}

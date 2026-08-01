@@ -12,7 +12,7 @@ import {
   Undo2,
   X,
 } from "lucide-react";
-import { C } from "../../lib/theme";
+import { C, pageBackground } from "../../lib/theme";
 import { countdownLabel, elapsedLabel, elapsedTimerLabel, finishTimeLabel, waitEstimateDisplay } from "../../lib/format";
 import { cancelSubmissionRecall, deleteSubmissionByPublicToken, getSubmissionByAccessKey, rateSubmissionByPublicToken, requestSubmissionRecall } from "../../lib/submissionsApi";
 import { PageFooter } from "../layout/PageFooter";
@@ -177,6 +177,7 @@ function SubmissionCard({
   const serviceLine = submission.serviceId ? serviceName(submission.serviceId) : "General";
   const selectedService = (services || []).find((service) => String(service.id) === String(submission.serviceId));
   const priceLabel = servicePriceLabel(selectedService, appearance.currency);
+  const serviceDescription = String(selectedService?.description || "").trim();
   const isQueued = submission.status === "queued";
   const isCalled = submission.status === "called";
   const isServing = submission.status === "serving";
@@ -322,10 +323,14 @@ function SubmissionCard({
     borderColor: appearance.borderColor,
     borderRadius: appearance.radius,
   };
+  const detailsText = appearance.bgColor;
+  const detailsMuted = withAlpha(appearance.bgColor, 0.62);
+  const detailsFaint = withAlpha(appearance.bgColor, 0.45);
+  const detailsLine = withAlpha(appearance.bgColor, 0.14);
   const detailsPanelStyle = {
-    color: C.textLight,
-    backgroundColor: "#000000",
-    borderColor: C.ink700,
+    color: detailsText,
+    backgroundColor: appearance.fontColor,
+    borderColor: detailsLine,
     borderRadius: appearance.radius,
   };
   return (
@@ -495,26 +500,26 @@ function SubmissionCard({
               <div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-3 text-left">
                 <div className="min-w-0">
                   <div data-testid="ticket-service-value" className="truncate text-base font-semibold" style={{ color: C.teal }}>{serviceLine}</div>
-                  <div data-testid="ticket-counter-value" className="mt-0.5 truncate text-xs font-normal" style={{ color: C.textMuted }}>
+                  <div data-testid="ticket-counter-value" className="mt-0.5 truncate text-xs font-normal" style={{ color: detailsMuted }}>
                     {ticketDeskName || "Counter"}
                   </div>
                 </div>
                 {priceLabel ? (
-                  <div className="qp-mono shrink-0 text-right text-base font-semibold" style={{ color: C.textLight }}>
+                  <div className="qp-mono shrink-0 text-right text-base font-semibold" style={{ color: detailsText }}>
                     {priceLabel}
                   </div>
                 ) : null}
               </div>
-              <div className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-start gap-2.5 border-t pt-3" style={{ borderColor: C.ink700 }}>
-                {servedByMember?.photo ? <img src={servedByMember.photo} alt={servedByName} className="h-10 w-10 shrink-0 rounded-full border object-cover" style={{ borderColor: C.ink700 }} /> : null}
+              <div className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-start gap-2.5 border-t pt-3" style={{ borderColor: detailsLine }}>
+                {servedByMember?.photo ? <img src={servedByMember.photo} alt={servedByName} className="h-10 w-10 shrink-0 rounded-full border object-cover" style={{ borderColor: detailsLine }} /> : null}
                 <div className="col-span-2 min-w-0">
                   <div className="flex items-center justify-between gap-3">
-                    <div className="text-[10px] font-normal uppercase" style={{ color: C.textMuted }}>Served by</div>
+                    <div className="text-[10px] font-normal uppercase" style={{ color: detailsMuted }}>Served by</div>
                     {serviceTimer ? (
-                      <span className="qp-mono shrink-0 whitespace-nowrap text-[10px]" style={{ color: C.textMuted }}>{serviceTimer}</span>
+                      <span className="qp-mono shrink-0 whitespace-nowrap text-[10px]" style={{ color: detailsMuted }}>{serviceTimer}</span>
                     ) : null}
                   </div>
-                  <div className="truncate text-sm font-semibold" style={{ color: C.textLight }}>
+                  <div className="truncate text-sm font-semibold" style={{ color: detailsText }}>
                     {servedByName}
                   </div>
                 </div>
@@ -526,7 +531,7 @@ function SubmissionCard({
                   <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full" style={{ backgroundColor: withAlpha(C.teal, 0.16), color: C.teal }}>
                     <Smile size={17} />
                   </span>
-                  <div className="text-left text-sm font-semibold leading-snug" style={{ color: C.textLight }}>How was your experience?</div>
+                  <div className="text-left text-sm font-semibold leading-snug" style={{ color: detailsText }}>How was your experience?</div>
                 </div>
                 <div className="mt-3 flex items-center justify-center gap-2 sm:gap-3" role="group" aria-label="Rate your experience">
                   {RATING_OPTIONS.map((option) => {
@@ -542,7 +547,7 @@ function SubmissionCard({
                         aria-pressed={selected}
                         className="qp-focusable flex h-9 w-9 items-center justify-center transition-transform duration-200 ease-out hover:scale-105 disabled:cursor-wait"
                         style={{
-                          color: filled ? selectedRating?.color : C.textFaint,
+                          color: filled ? selectedRating?.color : detailsFaint,
                           transform: selected ? "scale(1.08)" : "scale(1)",
                           transition: "color 180ms ease, transform 180ms ease",
                         }}
@@ -568,12 +573,12 @@ function SubmissionCard({
         <div className="flex items-center gap-3 px-4 py-3.5">
           <span
             className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border"
-            style={{ color: statusAccent, borderColor: C.ink700 }}
+            style={{ color: statusAccent, borderColor: detailsLine }}
           >
             <MapPin size={19} />
           </span>
           <div className="min-w-0">
-            <div className="text-[10px] font-semibold uppercase" style={{ color: C.textMuted }}>
+            <div className="text-[10px] font-semibold uppercase" style={{ color: detailsMuted }}>
               {counterLabel}
             </div>
             <div
@@ -616,13 +621,13 @@ function SubmissionCard({
             transform: serviceExpanded ? "translateY(0)" : "translateY(-6px)",
           }}
         >
-          <div className="flex flex-wrap items-start gap-2.5 border-t px-4 py-3.5" style={{ borderColor: C.ink700 }}>
-                {assignedMember?.photo ? <img src={assignedMember.photo} alt={servedByName} className="h-10 w-10 shrink-0 rounded-full border object-cover" style={{ borderColor: C.ink700 }} /> : null}
+          <div className="flex flex-wrap items-start gap-2.5 border-t px-4 py-3.5" style={{ borderColor: detailsLine }}>
+                {assignedMember?.photo ? <img src={assignedMember.photo} alt={servedByName} className="h-10 w-10 shrink-0 rounded-full border object-cover" style={{ borderColor: detailsLine }} /> : null}
             <div className="min-w-0 flex-1">
               <div className="flex min-w-0 items-center gap-2">
-                <div className="truncate text-sm font-semibold" style={{ color: C.textLight }}>{servedByName}</div>
+                <div className="truncate text-sm font-semibold" style={{ color: detailsText }}>{servedByName}</div>
               </div>
-              <div className="mt-0.5 flex items-center gap-1 text-xs" style={{ color: Number.isFinite(memberRating) ? C.amber : C.textFaint }}>
+              <div className="mt-0.5 flex items-center gap-1 text-xs" style={{ color: Number.isFinite(memberRating) ? C.amber : detailsFaint }}>
                 <span className="flex items-center" aria-label={Number.isFinite(memberRating) ? `${memberRating.toFixed(1)} out of 5` : "No ratings yet"}>
                   {[1, 2, 3, 4, 5].map((star) => (
                     <Star key={star} size={13} fill={Number.isFinite(memberRating) && star <= Math.round(memberRating) ? "currentColor" : "none"} aria-hidden="true" />
@@ -631,7 +636,7 @@ function SubmissionCard({
                 {Number.isFinite(memberRating) ? (
                   <>
                     <span>{memberRating.toFixed(1)}</span>
-                    <span style={{ color: C.textMuted }}>({memberRatings.length} {memberRatings.length === 1 ? "review" : "reviews"})</span>
+                    <span style={{ color: detailsMuted }}>({memberRatings.length} {memberRatings.length === 1 ? "review" : "reviews"})</span>
                   </>
                 ) : null}
               </div>
@@ -657,8 +662,14 @@ function SubmissionCard({
             ) : null}
             {assignedMember?.about ? (
               <div
-                className="basis-full overflow-hidden text-[10px]"
-                style={{ color: C.textMuted, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" }}
+                className="basis-full overflow-hidden text-[10px] leading-snug"
+                style={{
+                  color: detailsMuted,
+                  display: "-webkit-box",
+                  textOverflow: "ellipsis",
+                  WebkitBoxOrient: "vertical",
+                  WebkitLineClamp: 2,
+                }}
               >
                 {assignedMember.about}
               </div>
@@ -673,12 +684,18 @@ function SubmissionCard({
               />
             ) : null}
             <div className="min-w-0 flex-1">
-              <div className="text-[10px] font-semibold uppercase" style={{ color: C.textMuted }}>Service</div>
-              <div data-testid="ticket-service-value" className="mt-0.5 truncate text-base font-semibold" style={{ color: C.textLight }}>
-                {serviceLine}
+              <div className="flex min-w-0 items-baseline justify-between gap-3">
+                <div data-testid="ticket-service-value" className="min-w-0 truncate text-base font-semibold" style={{ color: detailsText }}>
+                  {serviceLine}
+                </div>
+                {priceLabel ? <div className="qp-mono shrink-0 text-base font-semibold" style={{ color: C.teal }}>{priceLabel}</div> : null}
               </div>
+              {serviceDescription ? (
+                <div className="mt-0.5 overflow-hidden text-[10px] text-ellipsis whitespace-nowrap" style={{ color: detailsMuted }}>
+                  {serviceDescription}
+                </div>
+              ) : null}
             </div>
-            {priceLabel ? <div className="qp-mono shrink-0 text-base font-semibold" style={{ color: C.teal }}>{priceLabel}</div> : null}
           </div>
         </div>
           </>
@@ -848,12 +865,14 @@ export function TicketPage({
     fontColor: theme?.fontColor || C.textLight,
     borderColor: theme?.borderColor || C.ink600,
     radius: Number(theme?.radius) || 8,
+    themeColors: theme?.themeColors,
   };
+  const lightThemeBorderColor = appearance.themeColors?.Light?.borderColor || appearance.borderColor;
 
   return (
     <main
       className="qp-page-shell qp-kiosk-page-shell qp-ticket-page-shell py-6 sm:py-8"
-      style={{ backgroundColor: appearance.bgColor, color: appearance.fontColor }}
+      style={{ backgroundColor: pageBackground(appearance), color: appearance.fontColor }}
     >
       <section className="qp-kiosk-panel qp-ticket-page-content" style={ticketPageStyle}>
         {exited ? (
@@ -930,7 +949,7 @@ export function TicketPage({
           <p className="mt-3 text-center text-xs" style={{ color: C.coral }}>{exitError}</p>
         ) : null}
       </section>
-      <PageFooter color={C.textFaint} className="qp-ticket-page-footer pt-3" />
+      <PageFooter color={`${appearance.fontColor}66`} className="qp-ticket-page-footer pt-3" />
       <ConfirmDialog
         confirmAction={exitConfirmOpen ? {
           title: "Are you sure?",
