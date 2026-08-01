@@ -25,6 +25,14 @@ function withAlpha(hex, alphaHex) {
   return `${hex}${alphaHex}`;
 }
 
+function isLightHex(hex) {
+  if (typeof hex !== "string" || !/^#[0-9a-f]{6}$/i.test(hex)) return false;
+  const r = parseInt(hex.slice(1, 3), 16);
+  const g = parseInt(hex.slice(3, 5), 16);
+  const b = parseInt(hex.slice(5, 7), 16);
+  return (r * 299 + g * 587 + b * 114) / 1000 > 180;
+}
+
 function fieldStyle(theme) {
   return {
     color: theme.fontColor,
@@ -155,7 +163,7 @@ function TextInput({ value, onChange, placeholder, theme }) {
 }
 
 function TimeInput({ value, onChange, theme }) {
-  const darkIcon = String(theme.fontColor || "").toLowerCase() !== "#0f172a";
+  const darkIcon = !isLightHex(theme.bgColor);
   const inputRef = useRef(null);
   const formattedValue = (() => {
     const [hourValue, minuteValue] = String(value || "").split(":").map(Number);
@@ -679,7 +687,7 @@ export function AdminCountersPage({
   const formRef = useRef(null);
   const editingDeskRecord = editingDesk ? desks.find((desk) => desk.id === editingDesk) : null;
   const showForm = showAddDesk || Boolean(editingDeskRecord);
-  const formTheme = { ...theme, bgColor: theme.bgColor || "#04060b" };
+  const formTheme = { ...theme, bgColor: theme.bgColor || "#060B17" };
   const assignableMembers = members.filter(memberCanBeAssignedToDesk);
 
   const filtered = desks.filter((desk) => {

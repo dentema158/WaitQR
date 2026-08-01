@@ -30,9 +30,9 @@ export function NotificationMenu({ notifications = [], theme, align = "right", o
   const clickedIdsRef = useRef(new Set());
   const unreadCount = notifications.filter((item) => !item.readAt).length;
   const totalCount = notifications.length;
-  const bgColor = theme?.bgColor || "#04060b";
-  const fontColor = theme?.fontColor || "#e2e8f0";
-  const borderColor = theme?.borderColor || "#171d2b";
+  const bgColor = theme?.bgColor || "#060B17";
+  const fontColor = theme?.fontColor || "#DBE3F0";
+  const borderColor = theme?.borderColor || "#1C1E21";
   const radius = theme?.radius || 12;
 
   const closeMenu = () => {

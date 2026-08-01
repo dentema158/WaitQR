@@ -6,8 +6,8 @@ import { getDeskPath, getMemberProfilePath } from "../../lib/routing";
 import { NotificationMenu } from "../shared/NotificationMenu";
 
 const THEME_PRESETS = {
-  Dark: { accentColor: "#2563eb", bgColor: "#04060b", fontColor: "#e2e8f0", borderColor: "#171d2b", separatorColor: "#171d2b" },
-  Light: { accentColor: "#2563eb", bgColor: "#f8fafc", fontColor: "#0f172a", borderColor: "#e2e8f0", separatorColor: "#e2e8f0" },
+  Dark: { accentColor: "#2563eb", bgColor: "#060B17", fontColor: "#DBE3F0", borderColor: "#1C1E21", separatorColor: "#1C1E21" },
+  Light: { accentColor: "#2563eb", bgColor: "#ECF2FB", fontColor: "#10192F", borderColor: "#D6D9E1", separatorColor: "#D6D9E1" },
 };
 
 function withAlpha(hex, alphaHex) {

@@ -529,7 +529,7 @@ export function AdminServicesPage({
   const formRef = useRef(null);
   const editingServiceRecord = editingService ? services.find((service) => service.id === editingService) : null;
   const showForm = showAddService || Boolean(editingServiceRecord);
-  const formTheme = { ...theme, bgColor: theme.bgColor || "#04060b" };
+  const formTheme = { ...theme, bgColor: theme.bgColor || "#060B17" };
   const assignableMembers = members.filter(memberCanBeAssignedToService);
 
   const filtered = services.filter((service) => {

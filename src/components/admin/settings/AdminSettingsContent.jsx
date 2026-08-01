@@ -22,6 +22,28 @@ function withAlpha(hex, alphaHex) {
   return `${hex}${alphaHex}`;
 }
 
+function normalizeHexColor(value) {
+  const clean = String(value || "").trim().replace(/^#/, "");
+  if (/^[0-9a-f]{3}$/i.test(clean)) {
+    return `#${clean.split("").map((char) => `${char}${char}`).join("").toUpperCase()}`;
+  }
+  if (/^[0-9a-f]{6}$/i.test(clean)) return `#${clean.toUpperCase()}`;
+  return null;
+}
+
+function formatHexDraft(value) {
+  const clean = String(value || "").replace(/[^0-9a-f]/gi, "").slice(0, 6);
+  return `#${clean.toUpperCase()}`;
+}
+
+function isLightHex(hex) {
+  if (typeof hex !== "string" || !/^#[0-9a-f]{6}$/i.test(hex)) return false;
+  const r = parseInt(hex.slice(1, 3), 16);
+  const g = parseInt(hex.slice(3, 5), 16);
+  const b = parseInt(hex.slice(5, 7), 16);
+  return (r * 299 + g * 587 + b * 114) / 1000 > 180;
+}
+
 function focusHandlers(accent, restoreBorderColor) {
   return {
     onFocus: (e) => {
@@ -154,9 +176,60 @@ function Field({ label, hint, children, fontColor, inline }) {
   );
 }
 
-function ColorSwatchInput({ label, hint, value, onChange, fontColor, radius, borderColor }) {
+function ColorSwatchInput({ label, hint, value, defaultValue, onChange, fontColor, radius, borderColor }) {
   const isNarrow = useIsNarrow();
   const compactRadius = Math.max(10, Math.min(14, radius));
+  const defaultColor = normalizeHexColor(defaultValue) || "#2563EB";
+  const selectedColor = normalizeHexColor(value) || defaultColor;
+  const [draft, setDraft] = useState(() => selectedColor);
+  const [open, setOpen] = useState(false);
+  const pickerRef = useRef(null);
+  const normalizedDraft = normalizeHexColor(draft);
+  const hasInvalidDraft = draft.length > 1 && !normalizedDraft;
+
+  useEffect(() => {
+    setDraft(selectedColor);
+  }, [selectedColor]);
+
+  useEffect(() => {
+    if (!open) return undefined;
+    const handlePointerDown = (event) => {
+      if (pickerRef.current && !pickerRef.current.contains(event.target)) setOpen(false);
+    };
+    document.addEventListener("mousedown", handlePointerDown);
+    return () => document.removeEventListener("mousedown", handlePointerDown);
+  }, [open]);
+
+  const handleTextChange = (nextValue) => {
+    const nextDraft = formatHexDraft(nextValue);
+    const nextColor = normalizeHexColor(nextDraft);
+    setDraft(nextDraft);
+    if (nextColor) onChange(nextColor);
+  };
+
+  const handleTextBlur = () => {
+    const nextColor = normalizeHexColor(draft);
+    if (nextColor) {
+      setDraft(nextColor);
+      onChange(nextColor);
+    } else {
+      setDraft(selectedColor);
+    }
+  };
+  const paletteColors = [
+    defaultColor,
+    "#0EA5E9",
+    "#14B8A6",
+    "#22C55E",
+    "#84CC16",
+    "#E8A33D",
+    "#F97316",
+    "#E2614F",
+    "#EC4899",
+    "#8B5CF6",
+    "#6366F1",
+    "#64748B",
+  ].filter((color, index, colors) => color && colors.indexOf(color) === index).slice(0, 12);
 
   return (
     <div
@@ -174,24 +247,123 @@ function ColorSwatchInput({ label, hint, value, onChange, fontColor, radius, bor
         )}
       </div>
       <div className="flex items-center gap-3" style={{ width: isNarrow ? "100%" : "16rem", flexShrink: 0 }}>
-        <label
-          className="relative h-9 w-9 shrink-0 cursor-pointer overflow-hidden border"
-          style={{ borderRadius: compactRadius, borderColor, backgroundColor: value }}
-        >
-          <span aria-hidden="true" className="pointer-events-none absolute inset-0" style={{ backgroundColor: value }} />
-          <input
-            type="color"
-            value={value}
-            onChange={(e) => onChange(e.target.value)}
-            className="absolute inset-0 h-full w-full cursor-pointer border-none p-0 opacity-0"
-          />
-        </label>
+        <div ref={pickerRef} className="relative shrink-0">
+          <button
+            type="button"
+            onClick={() => setOpen((current) => !current)}
+            className="relative h-9 w-9 overflow-hidden border outline-none transition-transform active:scale-95"
+            style={{
+              borderRadius: compactRadius,
+              borderColor: open ? selectedColor : borderColor,
+              backgroundColor: selectedColor,
+              boxShadow: open ? `0 0 0 3px ${withAlpha(selectedColor, "33")}` : "none",
+            }}
+            aria-label={`${label} picker`}
+            aria-expanded={open}
+          >
+            <span aria-hidden="true" className="absolute inset-0" style={{ backgroundColor: selectedColor }} />
+          </button>
+          {open && (
+            <div
+              className="absolute left-0 top-11 z-[130] border p-3 shadow-2xl"
+              style={{
+                width: isNarrow ? "min(16rem, calc(100vw - 2rem))" : "16rem",
+                color: fontColor,
+                borderColor,
+                borderRadius: compactRadius,
+                background: `color-mix(in srgb, var(--surface-bg, var(--field-bg)) 88%, ${isLightHex(fontColor) ? "white" : "black"} 12%)`,
+              }}
+            >
+              <div className="flex items-start gap-3">
+                <label
+                  className="relative h-16 w-16 shrink-0 cursor-pointer overflow-hidden border"
+                  style={{ borderRadius: compactRadius, borderColor, backgroundColor: selectedColor }}
+                  title="Open system picker"
+                >
+                  <span aria-hidden="true" className="absolute inset-0" style={{ backgroundColor: selectedColor }} />
+                  <input
+                    type="color"
+                    value={selectedColor}
+                    onChange={(e) => onChange(normalizeHexColor(e.target.value) || e.target.value)}
+                    className="absolute inset-0 h-full w-full cursor-pointer border-none p-0 opacity-0"
+                  />
+                </label>
+                <div className="min-w-0 flex-1">
+                  <div className="mb-1 flex items-center justify-between gap-2">
+                    <span className="text-[11px] font-medium uppercase tracking-wider" style={{ color: withAlpha(fontColor, "99") }}>
+                      Hex
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setOpen(false)}
+                      className="flex h-6 w-6 items-center justify-center rounded-full transition-colors hover:bg-white/5"
+                      style={{ color: withAlpha(fontColor, "99") }}
+                      aria-label="Close picker"
+                    >
+                      <X size={13} />
+                    </button>
+                  </div>
+                  <input
+                    value={draft}
+                    onChange={(e) => handleTextChange(e.target.value)}
+                    onBlur={handleTextBlur}
+                    autoFocus
+                    inputMode="text"
+                    spellCheck={false}
+                    aria-invalid={hasInvalidDraft}
+                    style={{
+                      color: fontColor,
+                      borderRadius: compactRadius,
+                      borderColor: hasInvalidDraft ? "#f87171" : borderColor,
+                      backgroundColor: "var(--field-bg)",
+                      fontVariantNumeric: "tabular-nums",
+                    }}
+                    className="h-10 w-full border px-3 py-2 text-sm font-semibold uppercase outline-none transition-colors"
+                  />
+                  <div className="mt-3 grid grid-cols-4 gap-2">
+                    {paletteColors.map((color) => (
+                      <button
+                        key={color}
+                        type="button"
+                        onClick={() => {
+                          setDraft(color);
+                          onChange(color);
+                        }}
+                        className="relative aspect-square w-full border-2 transition-transform hover:scale-105"
+                        style={{
+                          backgroundColor: color,
+                          borderColor: color === selectedColor ? fontColor : "transparent",
+                          borderRadius: 5,
+                        }}
+                        aria-label={color === defaultColor ? `Default ${color}` : color}
+                        title={color === defaultColor ? `Default ${color}` : color}
+                      />
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
         <input
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
-          {...focusHandlers(value, borderColor)}
-          style={{ color: fontColor, borderRadius: compactRadius, borderColor, backgroundColor: "var(--field-bg)" }}
-          className="h-9 w-full border px-3 py-2 text-sm uppercase outline-none transition-colors"
+          value={draft}
+          onChange={(e) => handleTextChange(e.target.value)}
+          onBlur={handleTextBlur}
+          onFocus={(e) => {
+            e.target.style.borderColor = selectedColor;
+            e.target.style.boxShadow = `0 0 0 3px ${withAlpha(selectedColor, "33")}`;
+          }}
+          inputMode="text"
+          spellCheck={false}
+          aria-invalid={hasInvalidDraft}
+          style={{
+            color: fontColor,
+            borderRadius: compactRadius,
+            borderColor: hasInvalidDraft ? "#f87171" : borderColor,
+            backgroundColor: "var(--field-bg)",
+            fontVariantNumeric: "tabular-nums",
+          }}
+          className="h-9 w-full border px-3 py-2 text-sm font-medium uppercase outline-none transition-colors"
         />
       </div>
     </div>
@@ -336,9 +508,11 @@ function SectionCard({ icon: Icon, iconBg, title, children, fontColor, borderCol
   );
 }
 
-export function AdminSettingsContent({ s, theme }) {
+export function AdminSettingsContent({ s, theme, defaultAppearance }) {
   const { accentColor, fontColor, borderColor, radius, logoUrl } = theme;
   const cardProps = { fontColor, borderColor, radius };
+  const defaultMode = theme.themeMode === "Light" ? "Light" : "Dark";
+  const defaultThemeColors = defaultAppearance?.themeColors?.[defaultMode] || defaultAppearance || {};
 
   return (
     <div className="space-y-4 px-2.5 py-2.5 sm:space-y-6 sm:px-6 sm:py-6 md:pl-10 md:pr-6">
@@ -419,10 +593,10 @@ export function AdminSettingsContent({ s, theme }) {
           borderColor={borderColor}
           radius={radius}
         />
-        <ColorSwatchInput label="Accent Color" hint="Used for active states, toggles, and the save button" value={accentColor} onChange={theme.setAccentColor} fontColor={fontColor} borderColor={borderColor} radius={radius} />
-        <ColorSwatchInput label="Background Color" hint="Base background color for the dashboard" value={theme.bgColor} onChange={theme.setBgColor} fontColor={fontColor} borderColor={borderColor} radius={radius} />
-        <ColorSwatchInput label="Font Color" hint="Text color used across labels, headings, and inputs" value={fontColor} onChange={theme.setFontColor} fontColor={fontColor} borderColor={borderColor} radius={radius} />
-        <ColorSwatchInput label="Border Color" hint="Applied to cards, inputs, and divider lines" value={borderColor} onChange={theme.setBorderColor} fontColor={fontColor} borderColor={borderColor} radius={radius} />
+        <ColorSwatchInput label="Accent Color" hint="Used for active states, toggles, and the save button" value={accentColor} defaultValue={defaultAppearance?.accentColor} onChange={theme.setAccentColor} fontColor={fontColor} borderColor={borderColor} radius={radius} />
+        <ColorSwatchInput label="Background Color" hint="Base background color for the dashboard" value={theme.bgColor} defaultValue={defaultThemeColors.bgColor} onChange={theme.setBgColor} fontColor={fontColor} borderColor={borderColor} radius={radius} />
+        <ColorSwatchInput label="Font Color" hint="Text color used across labels, headings, and inputs" value={fontColor} defaultValue={defaultThemeColors.fontColor} onChange={theme.setFontColor} fontColor={fontColor} borderColor={borderColor} radius={radius} />
+        <ColorSwatchInput label="Border Color" hint="Applied to cards, inputs, and divider lines" value={borderColor} defaultValue={defaultThemeColors.borderColor} onChange={theme.setBorderColor} fontColor={fontColor} borderColor={borderColor} radius={radius} />
         <RadiusControl value={radius} onChange={theme.setRadius} fontColor={fontColor} borderColor={borderColor} />
       </SectionCard>
 

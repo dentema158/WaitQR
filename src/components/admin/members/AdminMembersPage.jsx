@@ -625,7 +625,7 @@ export function AdminMembersPage({
   const formRef = useRef(null);
   const editingMemberRecord = editingMember ? members.find((member) => member.id === editingMember) : null;
   const showForm = showAddMember || Boolean(editingMemberRecord);
-  const formTheme = { ...theme, bgColor: theme.bgColor || "#04060b" };
+  const formTheme = { ...theme, bgColor: theme.bgColor || "#060B17" };
 
   const filtered = members.filter((member) => {
     const q = query.trim().toLowerCase();

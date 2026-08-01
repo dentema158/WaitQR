@@ -40,10 +40,10 @@ const COUNTER_NOTIFICATIONS_STORAGE_KEY = "waitqr:counter-notifications";
 const DEFAULT_APPEARANCE_SETTINGS = {
   systemName: "WaitQR",
   accentColor: "#2563eb",
-  bgColor: "#04060b",
-  fontColor: "#e2e8f0",
-  borderColor: "#171d2b",
-  separatorColor: "#171d2b",
+  bgColor: "#060B17",
+  fontColor: "#DBE3F0",
+  borderColor: "#1C1E21",
+  separatorColor: "#1C1E21",
   radius: 12,
   logoUrl: null,
   themeMode: "Dark",
@@ -51,18 +51,34 @@ const DEFAULT_APPEARANCE_SETTINGS = {
   themeColors: {
     Dark: {
       accentColor: "#2563eb",
-      bgColor: "#04060b",
-      fontColor: "#e2e8f0",
-      borderColor: "#171d2b",
-      separatorColor: "#171d2b",
+      bgColor: "#060B17",
+      fontColor: "#DBE3F0",
+      borderColor: "#1C1E21",
+      separatorColor: "#1C1E21",
     },
     Light: {
       accentColor: "#2563eb",
-      bgColor: "#f8fafc",
-      fontColor: "#0f172a",
-      borderColor: "#e2e8f0",
-      separatorColor: "#e2e8f0",
+      bgColor: "#ECF2FB",
+      fontColor: "#10192F",
+      borderColor: "#D6D9E1",
+      separatorColor: "#D6D9E1",
     },
+  },
+};
+const LEGACY_DEFAULT_THEME_COLORS = {
+  Dark: {
+    accentColor: "#2563eb",
+    bgColor: "#04060b",
+    fontColor: "#e2e8f0",
+    borderColor: "#171d2b",
+    separatorColor: "#171d2b",
+  },
+  Light: {
+    accentColor: "#2563eb",
+    bgColor: "#f8fafc",
+    fontColor: "#0f172a",
+    borderColor: "#e2e8f0",
+    separatorColor: "#e2e8f0",
   },
 };
 const APPEARANCE_STORAGE_KEY = "waitqr:appearance";
@@ -133,24 +149,61 @@ function CounterRoutePlaceholder({ loading, theme, onNavigate }) {
 
 function normalizeAppearance(appearance) {
   const source = appearance && typeof appearance === "object" ? appearance : {};
-  const borderColor = source.borderColor || DEFAULT_APPEARANCE_SETTINGS.borderColor;
-  const darkBorderColor = source.themeColors?.Dark?.borderColor || DEFAULT_APPEARANCE_SETTINGS.themeColors.Dark.borderColor;
-  const lightBorderColor = source.themeColors?.Light?.borderColor || DEFAULT_APPEARANCE_SETTINGS.themeColors.Light.borderColor;
+  const useMigratedDefault = (mode, key) => {
+    const legacy = LEGACY_DEFAULT_THEME_COLORS[mode];
+    const current = DEFAULT_APPEARANCE_SETTINGS.themeColors[mode];
+    const nextValue = source.themeColors?.[mode]?.[key];
+    return nextValue && String(nextValue).toLowerCase() !== String(legacy?.[key]).toLowerCase()
+      ? nextValue
+      : current[key];
+  };
+  const isDefaultAccent = !source.accentColor || String(source.accentColor).toLowerCase() === DEFAULT_APPEARANCE_SETTINGS.accentColor;
+  const resolvedSourceMode = resolveAppearanceThemeMode(source.themeMode);
+  const useMigratedTopLevelDefault = (key) => {
+    const nextValue = source[key];
+    const legacyValue = LEGACY_DEFAULT_THEME_COLORS[resolvedSourceMode]?.[key];
+    return nextValue && String(nextValue).toLowerCase() !== String(legacyValue).toLowerCase()
+      ? nextValue
+      : DEFAULT_APPEARANCE_SETTINGS.themeColors[resolvedSourceMode][key];
+  };
+  const borderColor = isDefaultAccent
+    ? useMigratedTopLevelDefault("borderColor")
+    : source.borderColor || DEFAULT_APPEARANCE_SETTINGS.borderColor;
+  const darkBorderColor = isDefaultAccent ? useMigratedDefault("Dark", "borderColor") : source.themeColors?.Dark?.borderColor || DEFAULT_APPEARANCE_SETTINGS.themeColors.Dark.borderColor;
+  const lightBorderColor = isDefaultAccent ? useMigratedDefault("Light", "borderColor") : source.themeColors?.Light?.borderColor || DEFAULT_APPEARANCE_SETTINGS.themeColors.Light.borderColor;
   return {
     ...DEFAULT_APPEARANCE_SETTINGS,
     ...source,
+    ...(isDefaultAccent
+      ? {
+        bgColor: useMigratedTopLevelDefault("bgColor"),
+        fontColor: useMigratedTopLevelDefault("fontColor"),
+      }
+      : {}),
     borderColor,
     separatorColor: borderColor,
     themeColors: {
       Dark: {
         ...DEFAULT_APPEARANCE_SETTINGS.themeColors.Dark,
         ...(source.themeColors?.Dark || {}),
+        ...(isDefaultAccent
+          ? {
+            bgColor: useMigratedDefault("Dark", "bgColor"),
+            fontColor: useMigratedDefault("Dark", "fontColor"),
+          }
+          : {}),
         borderColor: darkBorderColor,
         separatorColor: darkBorderColor,
       },
       Light: {
         ...DEFAULT_APPEARANCE_SETTINGS.themeColors.Light,
         ...(source.themeColors?.Light || {}),
+        ...(isDefaultAccent
+          ? {
+            bgColor: useMigratedDefault("Light", "bgColor"),
+            fontColor: useMigratedDefault("Light", "fontColor"),
+          }
+          : {}),
         borderColor: lightBorderColor,
         separatorColor: lightBorderColor,
       },

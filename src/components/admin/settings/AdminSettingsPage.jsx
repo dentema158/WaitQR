@@ -67,6 +67,7 @@ export function AdminSettingsPage({ theme, defaultAppearance, onSaveSettings, on
           handleResetQueue: onResetQueue,
         }}
         theme={theme}
+        defaultAppearance={defaultAppearance}
       />
     </div>
   );

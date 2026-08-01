@@ -14,8 +14,8 @@ import { getMemberProfilePath } from "../../lib/routing";
 import { NotificationMenu } from "../shared/NotificationMenu";
 
 const THEME_PRESETS = {
-  Dark: { accentColor: "#2563eb", bgColor: "#04060b", fontColor: "#e2e8f0", borderColor: "#171d2b", separatorColor: "#171d2b" },
-  Light: { accentColor: "#2563eb", bgColor: "#f8fafc", fontColor: "#0f172a", borderColor: "#e2e8f0", separatorColor: "#e2e8f0" },
+  Dark: { accentColor: "#2563eb", bgColor: "#060B17", fontColor: "#DBE3F0", borderColor: "#1C1E21", separatorColor: "#1C1E21" },
+  Light: { accentColor: "#2563eb", bgColor: "#ECF2FB", fontColor: "#10192F", borderColor: "#D6D9E1", separatorColor: "#D6D9E1" },
 };
 const COMPACT_SIDEBAR_QUERY = "(max-width: 1180px)";
 
@@ -36,6 +36,54 @@ function hexToRgb(hex) {
 
 function rgbToHex({ r, g, b }) {
   return `#${[r, g, b].map((value) => Math.round(value).toString(16).padStart(2, "0")).join("")}`;
+}
+
+function rgbToHsl({ r, g, b }) {
+  const rn = r / 255;
+  const gn = g / 255;
+  const bn = b / 255;
+  const max = Math.max(rn, gn, bn);
+  const min = Math.min(rn, gn, bn);
+  const lightness = (max + min) / 2;
+
+  if (max === min) return { h: 0, s: 0, l: lightness };
+
+  const delta = max - min;
+  const saturation = lightness > 0.5
+    ? delta / (2 - max - min)
+    : delta / (max + min);
+  let hue = 0;
+
+  if (max === rn) hue = (gn - bn) / delta + (gn < bn ? 6 : 0);
+  else if (max === gn) hue = (bn - rn) / delta + 2;
+  else hue = (rn - gn) / delta + 4;
+
+  return { h: hue / 6, s: saturation, l: lightness };
+}
+
+function hslToHex({ h, s, l }) {
+  if (s === 0) {
+    const value = l * 255;
+    return rgbToHex({ r: value, g: value, b: value });
+  }
+
+  const hueToRgb = (p, q, t) => {
+    let nextT = t;
+    if (nextT < 0) nextT += 1;
+    if (nextT > 1) nextT -= 1;
+    if (nextT < 1 / 6) return p + (q - p) * 6 * nextT;
+    if (nextT < 1 / 2) return q;
+    if (nextT < 2 / 3) return p + (q - p) * (2 / 3 - nextT) * 6;
+    return p;
+  };
+  const q = l < 0.5 ? l * (1 + s) : l + s - l * s;
+  const p = 2 * l - q;
+
+  return rgbToHex({
+    r: hueToRgb(p, q, h + 1 / 3) * 255,
+    g: hueToRgb(p, q, h) * 255,
+    b: hueToRgb(p, q, h - 1 / 3) * 255,
+  });
 }
 
 function mixHex(from, to, amount) {
@@ -60,16 +108,25 @@ function mutedPageBackground(bgColor, accentColor) {
   return mixHex(mixHex(bgColor, accentColor || bgColor, 0.035), "#94a3b8", 0.08);
 }
 
-function accentBackgroundColor(accentColor, mode) {
+function accentThemeColors(accentColor, mode) {
   const preset = THEME_PRESETS[mode] || THEME_PRESETS.Dark;
-  const mixAmount = 0.055;
-  return mixHex(preset.bgColor, accentColor, mixAmount);
-}
+  const mix = mode === "Light"
+    ? { bg: 0.055, font: 0.025, borderSaturation: 0.16, borderLightness: 0.86 }
+    : { bg: 0.055, font: 0.035, borderSaturation: 0.08, borderLightness: 0.12 };
+  const accentHsl = rgbToHsl(hexToRgb(accentColor) || hexToRgb(preset.accentColor));
+  const borderColor = hslToHex({
+    h: accentHsl.h,
+    s: Math.min(accentHsl.s * 0.35, mix.borderSaturation),
+    l: mix.borderLightness,
+  });
 
-function accentBorderColor(accentColor, mode) {
-  const preset = THEME_PRESETS[mode] || THEME_PRESETS.Dark;
-  const mixAmount = mode === "Light" ? 0.035 : 0.018;
-  return mixHex(preset.borderColor, accentColor, mixAmount);
+  return {
+    accentColor,
+    bgColor: mixHex(preset.bgColor, accentColor, mix.bg),
+    fontColor: mixHex(preset.fontColor, accentColor, mix.font),
+    borderColor,
+    separatorColor: borderColor,
+  };
 }
 
 function resolveThemeMode(themeMode) {
@@ -395,10 +452,10 @@ export function AdminShell({ currentPage, children, onNavigate, appearance, onAp
   ));
   const {
     accentColor = "#2563eb",
-    bgColor = "#04060b",
-    fontColor = "#e2e8f0",
-    borderColor = "#171d2b",
-    separatorColor = "#171d2b",
+    bgColor = THEME_PRESETS.Dark.bgColor,
+    fontColor = THEME_PRESETS.Dark.fontColor,
+    borderColor = THEME_PRESETS.Dark.borderColor,
+    separatorColor = THEME_PRESETS.Dark.separatorColor,
     radius = 12,
     logoUrl = null,
     themeMode = "Dark",
@@ -422,49 +479,28 @@ export function AdminShell({ currentPage, children, onNavigate, appearance, onAp
     };
 
     if (patch.accentColor) {
-      const darkBgColor = accentBackgroundColor(sharedAccentColor, "Dark");
-      const lightBgColor = accentBackgroundColor(sharedAccentColor, "Light");
-      const darkBorderColor = accentBorderColor(sharedAccentColor, "Dark");
-      const lightBorderColor = accentBorderColor(sharedAccentColor, "Light");
+      const darkColors = accentThemeColors(sharedAccentColor, "Dark");
+      const lightColors = accentThemeColors(sharedAccentColor, "Light");
+      const currentColorsForAccent = currentMode === "Light" ? lightColors : darkColors;
 
       nextThemeColors.Dark = {
         ...(nextThemeColors.Dark || THEME_PRESETS.Dark),
-        accentColor: sharedAccentColor,
-        bgColor: darkBgColor,
-        borderColor: darkBorderColor,
-        separatorColor: darkBorderColor,
+        ...darkColors,
       };
       nextThemeColors.Light = {
         ...(nextThemeColors.Light || THEME_PRESETS.Light),
-        accentColor: sharedAccentColor,
-        bgColor: lightBgColor,
-        borderColor: lightBorderColor,
-        separatorColor: lightBorderColor,
+        ...lightColors,
       };
       nextThemeColors[currentMode] = {
         ...nextColors,
-        accentColor: sharedAccentColor,
-        bgColor: currentMode === "Light" ? lightBgColor : darkBgColor,
-        borderColor: currentMode === "Light" ? lightBorderColor : darkBorderColor,
-        separatorColor: currentMode === "Light" ? lightBorderColor : darkBorderColor,
+        ...currentColorsForAccent,
       };
     }
 
     updateAppearance({
       ...patch,
       ...(patch.accentColor
-        ? {
-            accentColor: sharedAccentColor,
-            bgColor: currentMode === "Light"
-              ? nextThemeColors.Light.bgColor
-              : nextThemeColors.Dark.bgColor,
-            borderColor: currentMode === "Light"
-              ? nextThemeColors.Light.borderColor
-              : nextThemeColors.Dark.borderColor,
-            separatorColor: currentMode === "Light"
-              ? nextThemeColors.Light.separatorColor
-              : nextThemeColors.Dark.separatorColor,
-          }
+        ? nextThemeColors[currentMode]
         : {}),
       themeColors: nextThemeColors,
     });

@@ -6,6 +6,14 @@ function withAlpha(hex, alphaHex) {
   return `${hex}${alphaHex}`;
 }
 
+function isLightHex(hex) {
+  if (typeof hex !== "string" || !/^#[0-9a-f]{6}$/i.test(hex)) return false;
+  const r = parseInt(hex.slice(1, 3), 16);
+  const g = parseInt(hex.slice(3, 5), 16);
+  const b = parseInt(hex.slice(5, 7), 16);
+  return (r * 299 + g * 587 + b * 114) / 1000 > 180;
+}
+
 export function ConfirmDialog({ confirmAction, onCancel, onConfirm, theme }) {
   if (!confirmAction) return null;
   const isSuccess = confirmAction.variant === "success";
@@ -19,7 +27,7 @@ export function ConfirmDialog({ confirmAction, onCancel, onConfirm, theme }) {
     radius: theme?.radius || 12,
     themeMode: theme?.themeMode || "Dark",
   };
-  const isLight = colors.themeMode === "Light" || String(colors.fontColor).toLowerCase() === "#0f172a";
+  const isLight = colors.themeMode === "Light" || isLightHex(colors.bgColor);
   const modalBg = isLight
     ? colors.bgColor
     : `color-mix(in srgb, ${colors.bgColor} 84%, ${colors.fontColor} 16%)`;
