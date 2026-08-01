@@ -221,7 +221,8 @@ function Select({ value, onChange, options, accent, fontColor, borderColor, radi
 
 function TextArea({ value, onChange, onBlur, onSelect, placeholder, accent, fontColor, borderColor, radius, rows = 4, minHeight = 190, textareaRef, variant = "default" }) {
   const soft = variant === "soft";
-  const textareaBorderColor = soft ? "rgba(148, 163, 184, 0.28)" : borderColor;
+  const textareaBorderColor = borderColor;
+  const textareaBg = soft ? withAlpha(fontColor, "0d") : "var(--field-bg)";
 
   return (
     <textarea
@@ -240,7 +241,7 @@ function TextArea({ value, onChange, onBlur, onSelect, placeholder, accent, font
         color: fontColor,
         borderColor: textareaBorderColor,
         borderRadius: radius,
-        backgroundColor: soft ? "rgba(248,250,252,0.72)" : "var(--field-bg)",
+        backgroundColor: textareaBg,
         minHeight,
       }}
     />
@@ -257,16 +258,16 @@ function DynamicCodeChips({ onInsert, theme }) {
           key={code}
           type="button"
           onClick={() => onInsert(code)}
-          className="inline-flex min-h-6 items-center gap-1.5 px-2 text-[11px] font-semibold transition-opacity hover:opacity-85"
+          className="inline-flex min-h-6 items-center gap-1.5 px-2 text-[11px] font-medium transition-opacity hover:opacity-85"
           style={{
             color: accentColor,
             borderRadius: Math.max(8, radius),
-            backgroundColor: "rgba(248,250,252,0.72)",
+            backgroundColor: withAlpha(fontColor, "0d"),
           }}
           title={`Insert ${code}`}
         >
           <span style={{ color: withAlpha(fontColor, "99") }}>{label}</span>
-          <span className="font-mono">{code}</span>
+            <span className="font-mono font-medium">{code}</span>
         </button>
       ))}
     </div>
@@ -286,16 +287,16 @@ function FormattingChips({ activeFormats = new Set(), onFormat, theme }) {
             type="button"
             onMouseDown={(event) => event.preventDefault()}
             onClick={() => onFormat(format)}
-            className="inline-flex min-h-6 items-center gap-1.5 px-2 text-[11px] font-semibold transition-opacity hover:opacity-85"
+            className="inline-flex min-h-6 items-center gap-1.5 px-2 text-[11px] font-medium transition-opacity hover:opacity-85"
             style={{
               color: active ? "#ef4444" : fontColor,
               borderRadius: Math.max(8, radius),
-              backgroundColor: active ? "rgba(239, 68, 68, 0.14)" : "rgba(248,250,252,0.72)",
+              backgroundColor: active ? "rgba(239, 68, 68, 0.14)" : withAlpha(fontColor, "0d"),
             }}
             title={active ? `Remove ${format.label}` : `${format.prefix}${format.sample}${format.suffix}`}
           >
             <span>{format.label}</span>
-            <span className="font-mono" style={{ color: active ? "#ef4444" : withAlpha(fontColor, "99") }}>
+            <span className="font-mono font-medium" style={{ color: active ? "#ef4444" : withAlpha(fontColor, "99") }}>
               {format.prefix}{format.sample}{format.suffix}
             </span>
           </button>
@@ -628,7 +629,7 @@ function TurnNearRule({ rule, canRemove, onChange, onRemove, theme }) {
       style={{
         borderColor: withAlpha(borderColor, "99"),
         borderRadius: Math.max(10, radius),
-        backgroundColor: "rgba(15,23,42,0.04)",
+        backgroundColor: withAlpha(fontColor, "08"),
       }}
     >
       <div className={`grid gap-3 ${rule.mode === "both" ? "sm:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)_auto_minmax(0,1fr)_auto]" : "sm:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)_auto]"}`}>
@@ -909,7 +910,7 @@ function MessageTriggerField({ event, checked, template, onToggle, onTemplateCha
                   style={{
                     borderColor: withAlpha(borderColor, "99"),
                     borderRadius: Math.max(10, radius),
-                    backgroundColor: "rgba(15,23,42,0.04)",
+                    backgroundColor: withAlpha(fontColor, "08"),
                   }}
                 >
                   <p className="mb-1.5 text-xs font-medium" style={{ color: withAlpha(fontColor, "99") }}>
