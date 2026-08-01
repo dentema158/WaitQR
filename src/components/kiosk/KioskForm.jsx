@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef } from "react";
-import { ArrowLeft, ArrowRight, Check } from "lucide-react";
+import { ArrowRight, Check } from "lucide-react";
 import { C } from "../../lib/theme";
 import { getServiceAvailability } from "../../lib/serviceAvailability";
 
@@ -58,6 +58,7 @@ export function KioskForm({
   };
   const nameInvalid = Boolean(formErrors?.name);
   const phoneInvalid = Boolean(formErrors?.phone);
+  const serviceInvalid = Boolean(formErrors?.service);
   const phoneErrorText = phoneInvalid
     ? phoneDigits
       ? "Enter a valid mobile number."
@@ -73,9 +74,6 @@ export function KioskForm({
       event.target.style.boxShadow = fieldStyle.boxShadow;
     },
   };
-  const showServiceSelection = services.length > 1;
-  const directJoin = !showServiceSelection;
-  const defaultServiceId = services[0]?.id || "";
   const serviceAvailability = useMemo(() => {
     const map = {};
     services.forEach((service) => {
@@ -83,6 +81,14 @@ export function KioskForm({
     });
     return map;
   }, [desks, services]);
+  const availableServices = useMemo(
+    () => services.filter((service) => serviceAvailability[service.id]?.available !== false),
+    [serviceAvailability, services]
+  );
+  const showServiceSelection = availableServices.length > 1;
+  const directJoin = !showServiceSelection;
+  const serviceStepActive = issueStep === 2 && !directJoin;
+  const defaultServiceId = availableServices[0]?.id || "";
   const nameInputRef = useRef(null);
   const stepTitle = issueStep === 2 && !directJoin
     ? `Hello ${form.name?.trim() || "there"}`
@@ -127,7 +133,7 @@ export function KioskForm({
   };
 
   const joinActions = (
-    <div className="grid grid-cols-1 gap-3">
+    <div className="qp-kiosk-join-actions grid grid-cols-1 gap-3">
       <button
         type="button"
         onClick={() => {
@@ -139,14 +145,14 @@ export function KioskForm({
         style={{ background: appearance.fontColor, color: appearance.bgColor, borderRadius: appearance.radius, opacity: issuePending ? 0.6 : 1 }}
       >
         {issuePending ? "Saving..." : "Join queue"}
-        <ArrowRight size={15} />
+        <ArrowRight size={15} className={form.serviceId ? "qp-join-arrow-elastic" : ""} />
       </button>
     </div>
   );
 
   return (
     <div
-      className="w-full overflow-hidden p-3 sm:p-5"
+      className={`qp-kiosk-form w-full overflow-hidden p-3 sm:p-5 ${serviceStepActive ? "qp-kiosk-form-step2" : ""}`}
       style={{
         background: panelBackground,
         color: appearance.fontColor,
@@ -154,7 +160,7 @@ export function KioskForm({
         borderRadius: appearance.radius,
       }}
     >
-      <div className="mb-4 min-w-0">
+      <div className="qp-kiosk-form-header mb-4 min-w-0">
         <div className="min-w-0">
           <button
             type="button"
@@ -163,18 +169,17 @@ export function KioskForm({
             style={{ color: appearance.accentColor, cursor: issueStep === 2 && !directJoin ? "pointer" : "default" }}
             aria-label={issueStep === 2 && !directJoin ? "Back to details" : undefined}
           >
-            {issueStep === 2 && !directJoin ? <ArrowLeft size={18} className="mr-1 shrink-0" /> : null}
             <span className="min-w-0 flex-1 truncate">{stepTitle}</span>
           </button>
           {issueStep === 2 && showServiceSelection ? (
-            <div className="ml-[22px] mt-1 text-[10px] uppercase tracking-[0.16em] opacity-50" style={{ color: mutedText }}>
+            <div className="mt-1 text-[10px] uppercase tracking-[0.16em]" style={{ color: serviceInvalid ? C.coral : mutedText, opacity: serviceInvalid ? 1 : 0.5 }}>
               Select a {serviceWord}
             </div>
           ) : null}
         </div>
       </div>
 
-      <div className="flex flex-col gap-4">
+      <div className="qp-kiosk-form-body flex flex-col gap-4">
         {issueStep === 1 && (
           <>
             <div className="grid gap-3">
@@ -250,12 +255,10 @@ export function KioskForm({
         {issueStep === 2 && (
           <>
             {showServiceSelection ? (
-              <div>
+              <div className="qp-kiosk-service-scroll">
                 <div className="grid gap-2">
-                  {services.map((s) => {
+                  {availableServices.map((s) => {
                     const selected = form.serviceId === s.id;
-                    const availability = serviceAvailability[s.id] || { available: true, assignedCount: 0 };
-                    const unavailable = !availability.available;
                     const priceLabel = servicePriceLabel(s, appearance.currency);
                     const hasImage = Boolean(s.image);
                     const description = String(s.description || "").trim();
@@ -264,29 +267,24 @@ export function KioskForm({
                         key={s.id}
                         type="button"
                         onClick={() => {
-                          if (availability.available) {
-                            setForm((f) => ({ ...f, serviceId: s.id }));
-                            if (formError) setFormError?.("");
-                          }
+                          setForm((f) => ({ ...f, serviceId: s.id }));
+                          if (serviceInvalid) setFormErrors?.((errors) => ({ ...errors, service: false }));
+                          if (formError) setFormError?.("");
                         }}
                         className="qp-focusable flex items-center justify-between gap-3 px-4 py-3.5 text-left transition-colors"
                         style={{
                           background: selected
-                            ? unavailable
-                              ? "rgba(226,97,79,0.16)"
-                              : withAlpha(appearance.accentColor, "29")
-                            : unavailable
-                              ? "rgba(255,255,255,0.01)"
-                              : "rgba(255,255,255,0.015)",
+                            ? withAlpha(appearance.accentColor, "29")
+                            : "rgba(255,255,255,0.18)",
                           color: appearance.fontColor,
-                          opacity: unavailable ? 0.55 : 1,
                           borderRadius: appearance.radius,
+                          boxShadow: selected ? "none" : "0 4px 14px rgba(15,23,42,0.05)",
                         }}
                       >
-                        <div className="flex min-w-0 flex-1 items-center gap-3">
+                        <div className="flex min-w-0 flex-1 items-start gap-3">
                           {hasImage ? (
                             <span
-                              className="relative flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden border"
+                              className="relative flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden border"
                               style={{
                                 borderColor: selected ? appearance.accentColor : appearance.borderColor,
                                 borderRadius: appearance.radius,
@@ -302,9 +300,9 @@ export function KioskForm({
                             </span>
                           ) : (
                             <span
-                              className="flex h-4 w-4 shrink-0 items-center justify-center border"
+                              className="mt-1 flex h-4 w-4 shrink-0 items-center justify-center border"
                               style={{
-                                borderColor: selected ? appearance.accentColor : appearance.borderColor,
+                                borderColor: appearance.accentColor,
                                 backgroundColor: selected ? appearance.accentColor : "transparent",
                                 borderRadius: appearance.radius,
                                 color: appearance.bgColor,
@@ -315,8 +313,8 @@ export function KioskForm({
                             </span>
                           )}
                           <div className="min-w-0 flex-1">
-                            <div className="flex min-w-0 items-baseline justify-between gap-3">
-                              <div className="min-w-0 truncate text-[15px] font-semibold">{s.name}</div>
+                            <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-baseline gap-3">
+                              <div className="overflow-hidden text-ellipsis whitespace-nowrap text-[15px] font-semibold">{s.name}</div>
                               {priceLabel ? (
                                 <div className="qp-mono shrink-0 text-sm font-semibold" style={{ color: selected ? appearance.accentColor : mutedText }}>
                                   {priceLabel}
@@ -334,11 +332,6 @@ export function KioskForm({
                                 }}
                               >
                                 {description}
-                              </div>
-                            ) : null}
-                            {unavailable ? (
-                              <div className="mt-0.5 text-[10px] uppercase tracking-[0.14em]" style={{ color: C.coral }}>
-                                Unavailable
                               </div>
                             ) : null}
                           </div>

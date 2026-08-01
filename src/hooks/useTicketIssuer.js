@@ -7,17 +7,18 @@ export function useTicketIssuer({ services, queue, desks, setQueue, serviceWordL
   const [form, setForm] = useState({ name: "", phone: "", serviceId: "" });
   const [issueStep, setIssueStep] = useState(1);
   const [formError, setFormError] = useState("");
-  const [formErrors, setFormErrors] = useState({ name: false, phone: false });
+  const [formErrors, setFormErrors] = useState({ name: false, phone: false, service: false });
   const [toast, setToast] = useState(null);
   const [issuePending, setIssuePending] = useState(false);
 
   const issuedToday = counters.general + counters.priority;
+  const availableServices = services.filter((service) => getServiceAvailability(desks, service.id).available);
 
   const resetForm = () => {
     setForm({ name: "", phone: "", serviceId: "" });
     setIssueStep(1);
     setFormError("");
-    setFormErrors({ name: false, phone: false });
+    setFormErrors({ name: false, phone: false, service: false });
   };
 
   const isValidPhone = (phoneDigits) => phoneDigits.length >= 7 && phoneDigits.length <= 15;
@@ -29,18 +30,18 @@ export function useTicketIssuer({ services, queue, desks, setQueue, serviceWordL
     const missingPhone = !phoneDigits;
 
     if (missingName || missingPhone) {
-      setFormErrors({ name: missingName, phone: missingPhone });
+      setFormErrors({ name: missingName, phone: missingPhone, service: false });
       setFormError("");
       return false;
     }
 
     if (!isValidPhone(phoneDigits)) {
-      setFormErrors({ name: false, phone: true });
+      setFormErrors({ name: false, phone: true, service: false });
       setFormError("");
       return false;
     }
 
-    setFormErrors({ name: false, phone: false });
+    setFormErrors({ name: false, phone: false, service: false });
     setFormError("");
     setIssueStep(2);
     return true;
@@ -57,24 +58,25 @@ export function useTicketIssuer({ services, queue, desks, setQueue, serviceWordL
     const name = form.name.trim();
     const phoneRaw = form.phone.trim();
     const phoneDigits = phoneRaw.replace(/\D/g, "");
-    const selectedServiceId = serviceIdOverride || form.serviceId || (services.length === 1 ? services[0].id : "");
+    const selectedServiceId = serviceIdOverride || form.serviceId || (availableServices.length === 1 ? availableServices[0].id : "");
     const missingName = !name;
     const missingPhone = !phoneDigits;
 
     if (missingName || missingPhone) {
-      setFormErrors({ name: missingName, phone: missingPhone });
+      setFormErrors({ name: missingName, phone: missingPhone, service: false });
       setFormError("");
       return;
     }
 
     if (!isValidPhone(phoneDigits)) {
-      setFormErrors({ name: false, phone: true });
+      setFormErrors({ name: false, phone: true, service: false });
       setFormError("");
       return;
     }
 
-    if (services.length > 1 && !selectedServiceId) {
-      setFormError(`Please choose a ${serviceWordLower} to continue.`);
+    if (availableServices.length > 1 && !selectedServiceId) {
+      setFormErrors({ name: false, phone: false, service: true });
+      setFormError("");
       return;
     }
 
@@ -82,7 +84,7 @@ export function useTicketIssuer({ services, queue, desks, setQueue, serviceWordL
       setFormError(`Selected ${serviceWordLower} is unavailable. Choose an open ${serviceWordLower}.`);
       return;
     }
-    setFormErrors({ name: false, phone: false });
+    setFormErrors({ name: false, phone: false, service: false });
     setFormError("");
 
     const inQueue = queue.find((t) => t.phone.replace(/\D/g, "") === phoneDigits);

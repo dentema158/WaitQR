@@ -16,12 +16,17 @@ export function CreatePage({ ticketIssuer, desks, services, labels, theme }) {
     currency: theme?.currency || "USD",
   };
 
+  const serviceStepActive = ticketIssuer.issueStep === 2 && services.length > 1;
+
   return (
     <main
-      className="qp-page-shell qp-kiosk-page-shell qp-ticket-page-shell py-6 sm:py-8"
+      className={`qp-page-shell qp-kiosk-page-shell qp-ticket-page-shell py-6 sm:py-8 ${serviceStepActive ? "qp-kiosk-page-step2" : ""}`}
       style={{ backgroundColor: pageBackground(appearance), color: appearance.fontColor }}
     >
-      <section className="qp-kiosk-panel qp-ticket-page-content" style={createPageStyle}>
+      <section
+        className={`qp-kiosk-panel qp-ticket-page-content ${serviceStepActive ? "qp-kiosk-create-step2" : ""}`}
+        style={serviceStepActive ? undefined : createPageStyle}
+      >
         <KioskForm
           theme={appearance}
           form={ticketIssuer.form}
