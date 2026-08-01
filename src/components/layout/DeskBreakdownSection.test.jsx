@@ -39,7 +39,7 @@ test("uses active theme colors for counter rail tickets and popup", () => {
   );
 
   expect(screen.getByLabelText("Open")).toBeInTheDocument();
-  expect(screen.getByText("2 members")).toBeInTheDocument();
+  expect(screen.getByText("Ripa & Sumi")).toBeInTheDocument();
   const ticket = screen.getByRole("button", { name: /A001/i });
   expect(ticket).toHaveStyle({ color: theme.fontColor });
 
@@ -47,4 +47,42 @@ test("uses active theme colors for counter rail tickets and popup", () => {
 
   expect(screen.getByText("A001 · Jane")).toHaveStyle({ color: theme.fontColor });
   expect(screen.getByText("Customer: Jane")).toHaveStyle({ borderColor: theme.borderColor });
+});
+
+test("separates receptionists from staff in counter card member labels", () => {
+  const baseProps = {
+    embedded: true,
+    theme,
+    desks: [
+      { id: "desk-1", name: "Counter 1", services: ["hair"], status: "Available" },
+      { id: "desk-2", name: "Counter 2", services: ["hair"], status: "Available" },
+    ],
+    members: [
+      { id: "member-1", name: "Ripa", role: "Member", deskIds: ["desk-1", "desk-2"] },
+      { id: "member-2", name: "Sumi", role: "Member", deskIds: ["desk-2"] },
+      { id: "member-3", name: "Anika", role: "Receptionist", deskIds: ["desk-1", "desk-2"] },
+    ],
+    deskWord: "Counter",
+    deskWordPluralLower: "counters",
+    servedByDesk: {},
+    absentByDesk: {},
+    removedByDesk: {},
+    waitingByDesk: {},
+    sortedQueue: [],
+    sortedServed: [],
+    absentList: [],
+    removedLog: [],
+    serviceName: () => "Hair Cut",
+    now: 10_000,
+    getDeskPath: (desk) => `/counters/${desk.id}`,
+  };
+
+  render(
+    <div style={{ "--surface-bg": theme.bgColor }}>
+      <DeskBreakdownSection {...baseProps} />
+    </div>,
+  );
+
+  expect(screen.getByText("Ripa & 1 receptionist")).toBeInTheDocument();
+  expect(screen.getByText("2 Staff & 1 receptionist")).toBeInTheDocument();
 });

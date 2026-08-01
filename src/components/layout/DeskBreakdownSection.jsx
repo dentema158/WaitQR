@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { CalendarDays, ExternalLink, LayoutGrid, Lock, Unlock } from "lucide-react";
+import { assignedMembersForDesk, memberCanBeAssignedToService, normalizeMemberRole } from "../../lib/assignments";
 import { C } from "../../lib/theme";
 import { elapsedLabel } from "../../lib/format";
 import { orderTicketsForDesk } from "../../hooks/useQueue";
@@ -106,6 +107,21 @@ function MemberAvatar({ member, palette, size = "h-7 w-7" }) {
       {member.photo ? <img src={member.photo} alt={member.name} className="h-full w-full object-cover" /> : memberInitials(member.name)}
     </span>
   );
+}
+
+function staffReceptionistLabel(staffMembers = [], receptionistMembers = []) {
+  const parts = [];
+  if (staffMembers.length === 1) {
+    parts.push(staffMembers[0].name || "Staff");
+  } else if (staffMembers.length === 2 && receptionistMembers.length === 0) {
+    parts.push(staffMembers.map((member) => member.name || "Staff").join(" & "));
+  } else if (staffMembers.length > 1) {
+    parts.push(`${staffMembers.length} Staff`);
+  }
+  if (receptionistMembers.length > 0) {
+    parts.push(`${receptionistMembers.length} receptionist${receptionistMembers.length === 1 ? "" : "s"}`);
+  }
+  return parts.join(" & ");
 }
 
 function normalizeDeskTickets({ desk, sortedQueue, sortedServed, absentList, removedLog }) {
@@ -392,7 +408,11 @@ export function DeskBreakdownSection({
             const absent = absentByDesk[desk.id] || 0;
             const removed = removedByDesk[desk.id] || 0;
             const waiting = waitingByDesk[desk.id] || 0;
-            const assignedMembers = members.filter((member) => Array.isArray(member.deskIds) && member.deskIds.map(String).includes(String(desk.id)));
+            const assignedMembers = assignedMembersForDesk(members, desk.id);
+            const staffMembers = assignedMembers.filter(memberCanBeAssignedToService);
+            const receptionistMembers = assignedMembers.filter((member) => normalizeMemberRole(member.role) === "Receptionist");
+            const avatarMembers = [...staffMembers, ...receptionistMembers];
+            const assignedMembersLabel = staffReceptionistLabel(staffMembers, receptionistMembers);
             const currentTicket = desk.current || null;
             const activeFilter = ticketFilters[desk.id] || "waiting";
             const deskTickets = normalizeDeskTickets({ desk, sortedQueue, sortedServed, absentList, removedLog });
@@ -432,22 +452,22 @@ export function DeskBreakdownSection({
                       <div className="min-h-7">
                         {assignedMembers.length > 0 && (
                           <div className="flex min-w-0 items-center overflow-hidden text-[12px]" style={{ color: withAlpha(palette.fontColor, "80") }}>
-                            {assignedMembers.length === 1 ? (
+                            {avatarMembers.length === 1 && staffMembers.length === 1 && receptionistMembers.length === 0 ? (
                               <span className="inline-flex min-w-0 max-w-full items-center gap-1.5">
-                                <MemberAvatar member={assignedMembers[0]} palette={palette} size="h-7 w-7" />
-                                <span className="max-w-[11rem] truncate leading-none" style={{ color: withAlpha(palette.fontColor, "70") }}>{assignedMembers[0].name}</span>
+                                <MemberAvatar member={avatarMembers[0]} palette={palette} size="h-7 w-7" />
+                                <span className="max-w-[11rem] truncate leading-none" style={{ color: withAlpha(palette.fontColor, "70") }}>{assignedMembersLabel}</span>
                               </span>
                             ) : (
                               <span className="inline-flex max-w-full min-w-0 items-center gap-2">
                                 <span className="flex shrink-0 -space-x-2">
-                                  {assignedMembers.slice(0, 4).map((member, index) => (
+                                  {avatarMembers.slice(0, 4).map((member, index) => (
                                     <span key={member.id} className="relative shrink-0" style={{ zIndex: 4 - index }}>
                                       <MemberAvatar member={member} palette={palette} size="h-7 w-7" />
                                     </span>
                                   ))}
                                 </span>
                                 <span className="min-w-0 truncate text-xs font-medium leading-none" style={{ color: withAlpha(palette.fontColor, "70") }}>
-                                  {assignedMembers.length} members
+                                  {assignedMembersLabel}
                                 </span>
                               </span>
                             )}
