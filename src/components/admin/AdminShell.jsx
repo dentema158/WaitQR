@@ -320,7 +320,7 @@ function Sidebar({ variant, open, onClose, currentPage, onNavigate, theme, colla
 
   const content = (
     <>
-      <div className={`mb-6 flex items-center px-2 ${isCollapsed ? "justify-center" : "justify-between"}`}>
+      <div className={`relative mb-6 flex h-8 items-center ${isCollapsed ? "justify-center px-0" : "justify-between px-3"}`}>
         <button
           type="button"
           onClick={() => onNavigate("/")}
@@ -360,20 +360,20 @@ function Sidebar({ variant, open, onClose, currentPage, onNavigate, theme, colla
             <ChevronLeft size={16} />
           </button>
         )}
-      </div>
 
-      {variant === "desktop" && isCollapsed && (
-        <button
-          type="button"
-          onClick={onToggleCollapse}
-          title="Expand sidebar"
-          aria-label="Expand sidebar"
-          className="mb-2 flex h-7 w-7 shrink-0 items-center justify-center self-center rounded-full transition-colors hover:bg-white/5"
-          style={{ color: withAlpha(fontColor, "80") }}
-        >
-          <ChevronRight size={16} />
-        </button>
-      )}
+        {variant === "desktop" && isCollapsed && (
+          <button
+            type="button"
+            onClick={onToggleCollapse}
+            title="Expand sidebar"
+            aria-label="Expand sidebar"
+            className="absolute right-0 top-1/2 flex h-7 w-6 -translate-y-1/2 items-center justify-center rounded-full transition-colors hover:bg-white/5"
+            style={{ color: withAlpha(fontColor, "80") }}
+          >
+            <ChevronRight size={17} />
+          </button>
+        )}
+      </div>
 
       <nav className="flex-1 space-y-1 overflow-y-auto overflow-x-hidden">
         {ADMIN_NAV_ITEMS.map(({ label, icon: Icon, path, page }) => {
@@ -385,8 +385,8 @@ function Sidebar({ variant, open, onClose, currentPage, onNavigate, theme, colla
               onClick={() => handleNavClick({ path })}
               title={isCollapsed ? label : undefined}
               aria-label={label}
-              className={`relative flex w-full items-center gap-3 py-2 text-sm transition-colors hover:bg-white/5 ${
-                isCollapsed ? "justify-center px-0" : "px-3"
+              className={`relative flex items-center gap-3 text-sm transition-colors hover:bg-white/5 ${
+                isCollapsed ? "mx-auto h-9 w-9 justify-center p-0" : "w-full px-3 py-2"
               }`}
               style={{
                 borderRadius: radius,
@@ -396,7 +396,7 @@ function Sidebar({ variant, open, onClose, currentPage, onNavigate, theme, colla
                   : { color: withAlpha(fontColor, path ? "99" : "55") }),
               }}
             >
-              {active && (
+              {active && !isCollapsed && (
                 <span className="absolute left-0 top-1/2 h-5 w-1 -translate-y-1/2 rounded-r-full" style={{ backgroundColor: accentColor }} />
               )}
               <Icon size={17} className="shrink-0" />
@@ -410,7 +410,7 @@ function Sidebar({ variant, open, onClose, currentPage, onNavigate, theme, colla
         type="button"
         title={isCollapsed ? "Logout" : undefined}
         aria-label="Logout"
-        className={`mt-4 flex items-center gap-3 py-2 text-sm hover:bg-white/5 ${isCollapsed ? "justify-center px-0" : "px-3"}`}
+        className={`mt-4 flex items-center gap-3 text-sm hover:bg-white/5 ${isCollapsed ? "mx-auto h-9 w-9 justify-center p-0" : "px-3 py-2"}`}
         style={{ color: withAlpha(fontColor, "99"), borderRadius: radius }}
       >
         <LogOut size={17} className="shrink-0" />
@@ -437,8 +437,8 @@ function Sidebar({ variant, open, onClose, currentPage, onNavigate, theme, colla
 
   return (
     <aside
-      className="sticky top-0 hidden h-screen shrink-0 flex-col overflow-hidden p-3 transition-[width] duration-200 md:flex"
-      style={{ backgroundColor: sidebarBgColor, width: isCollapsed ? 64 : 220 }}
+      className="sticky top-0 hidden h-screen shrink-0 flex-col overflow-hidden px-3 pb-3 pt-5 transition-[width] duration-200 md:flex"
+      style={{ backgroundColor: sidebarBgColor, width: isCollapsed ? 108 : 220 }}
     >
       {content}
     </aside>

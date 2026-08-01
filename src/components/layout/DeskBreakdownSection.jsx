@@ -460,8 +460,8 @@ export function DeskBreakdownSection({
                             ) : (
                               <span className="inline-flex max-w-full min-w-0 items-center gap-2">
                                 <span className="flex shrink-0 -space-x-2">
-                                  {avatarMembers.slice(0, 4).map((member, index) => (
-                                    <span key={member.id} className="relative shrink-0" style={{ zIndex: 4 - index }}>
+                                  {avatarMembers.slice(0, 6).map((member, index) => (
+                                    <span key={member.id} className="relative shrink-0" style={{ zIndex: 6 - index }}>
                                       <MemberAvatar member={member} palette={palette} size="h-7 w-7" />
                                     </span>
                                   ))}
