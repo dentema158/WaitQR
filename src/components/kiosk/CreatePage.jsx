@@ -1,4 +1,5 @@
 import { KioskForm } from "./KioskForm";
+import { PageFooter } from "../layout/PageFooter";
 
 export function CreatePage({ ticketIssuer, desks, services, labels }) {
   return (
@@ -19,6 +20,7 @@ export function CreatePage({ ticketIssuer, desks, services, labels }) {
           issuePending={ticketIssuer.issuePending}
         />
       </section>
+      <PageFooter className="mt-auto" />
     </main>
   );
 }

@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 import { ADMIN_NAV_ITEMS, ADMIN_PAGE_META } from "./adminNavigation";
 import { getMemberProfilePath } from "../../lib/routing";
+import { PageFooter } from "../layout/PageFooter";
 import { NotificationMenu } from "../shared/NotificationMenu";
 
 const THEME_PRESETS = {
@@ -308,7 +309,7 @@ function ProfileMenu({ member, masterLoggedIn, accentColor, fontColor, borderCol
   );
 }
 
-function Sidebar({ variant, open, onClose, currentPage, onNavigate, theme, collapsed, onToggleCollapse, pageBgColor }) {
+function Sidebar({ variant, open, onClose, currentPage, onNavigate, theme, collapsed, onToggleCollapse, pageBgColor, onLogout }) {
   const { accentColor, fontColor, bgColor, radius, logoUrl } = theme;
   const isCollapsed = variant === "desktop" && collapsed;
   const sidebarBgColor = pageBgColor || bgColor;
@@ -410,6 +411,7 @@ function Sidebar({ variant, open, onClose, currentPage, onNavigate, theme, colla
         type="button"
         title={isCollapsed ? "Logout" : undefined}
         aria-label="Logout"
+        onClick={onLogout}
         className={`mt-4 flex items-center gap-3 text-sm hover:bg-white/5 ${isCollapsed ? "mx-auto h-9 w-9 justify-center p-0" : "px-3 py-2"}`}
         style={{ color: withAlpha(fontColor, "99"), borderRadius: radius }}
       >
@@ -580,6 +582,7 @@ export function AdminShell({ currentPage, children, onNavigate, appearance, onAp
         collapsed={sidebarCollapsed}
         onToggleCollapse={() => setSidebarCollapsed((value) => !value)}
         pageBgColor={pageBgColor}
+        onLogout={onLogoutMember}
       />
       <Sidebar
         variant="mobile"
@@ -589,9 +592,10 @@ export function AdminShell({ currentPage, children, onNavigate, appearance, onAp
         onNavigate={onNavigate}
         theme={theme}
         pageBgColor={pageBgColor}
+        onLogout={onLogoutMember}
       />
 
-      <main className="min-w-0 flex-1" style={{ backgroundColor: pageBgColor }}>
+      <main className="flex min-w-0 flex-1 flex-col" style={{ backgroundColor: pageBgColor }}>
         <div
           className="sticky top-0 z-[100] flex items-center justify-between gap-3 px-2.5 py-2.5 sm:px-6 sm:py-5 md:pl-10 md:pr-6"
           style={{ backgroundColor: "var(--page-bg)" }}
@@ -641,7 +645,10 @@ export function AdminShell({ currentPage, children, onNavigate, appearance, onAp
           </div>
         </div>
 
-        {content}
+        <div className="flex min-h-0 flex-1 flex-col">
+          {content}
+        </div>
+        <PageFooter color={withAlpha(fontColor, "66")} className="mt-auto" />
       </main>
     </div>
   );

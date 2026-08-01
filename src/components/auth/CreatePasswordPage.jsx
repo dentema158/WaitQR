@@ -1,5 +1,6 @@
 import { KeyRound, UserRound } from "lucide-react";
 import { useEffect, useState } from "react";
+import { PageFooter } from "../layout/PageFooter";
 
 function withAlpha(hex, alphaHex) {
   if (!hex || hex.length !== 7) return hex;
@@ -92,8 +93,9 @@ export function CreatePasswordPage({ members, theme, loading, initialIdentifier 
   };
 
   return (
-    <main className="flex min-h-screen w-full items-center justify-center px-4 py-6" style={{ backgroundColor: theme.bgColor, color: theme.fontColor }}>
-      <section className="w-full max-w-md border bg-white/5 p-5 shadow-xl" style={{ borderColor: theme.borderColor, borderRadius: theme.radius * 1.4 }}>
+    <main className="flex min-h-screen w-full flex-col px-4 py-6" style={{ backgroundColor: theme.bgColor, color: theme.fontColor }}>
+      <div className="flex flex-1 items-center justify-center">
+        <section className="w-full max-w-md border bg-white/5 p-5 shadow-xl" style={{ borderColor: theme.borderColor, borderRadius: theme.radius * 1.4 }}>
         <div className="mb-6 flex items-center gap-3">
           <div className="flex h-12 w-12 items-center justify-center rounded-full" style={{ backgroundColor: withAlpha(theme.accentColor, "1f"), color: theme.accentColor }}>
             <KeyRound size={22} />
@@ -171,7 +173,9 @@ export function CreatePasswordPage({ members, theme, loading, initialIdentifier 
         >
           Back to login
         </button>
-      </section>
+        </section>
+      </div>
+      <PageFooter color={`${theme.fontColor}66`} className="mt-auto" />
     </main>
   );
 }

@@ -15,6 +15,7 @@ import {
 import { C } from "../../lib/theme";
 import { countdownLabel, elapsedLabel, elapsedTimerLabel, finishTimeLabel, waitEstimateDisplay } from "../../lib/format";
 import { cancelSubmissionRecall, deleteSubmissionByPublicToken, getSubmissionByAccessKey, rateSubmissionByPublicToken, requestSubmissionRecall } from "../../lib/submissionsApi";
+import { PageFooter } from "../layout/PageFooter";
 import { ConfirmDialog } from "../modals/ConfirmDialog";
 
 const ticketPageStyle = {
@@ -929,17 +930,7 @@ export function TicketPage({
           <p className="mt-3 text-center text-xs" style={{ color: C.coral }}>{exitError}</p>
         ) : null}
       </section>
-      <footer className="qp-ticket-page-footer w-full pt-3 text-center text-[11px] leading-tight" style={{ color: C.textFaint }}>
-        <a
-          href="https://waitqr.com"
-          title="waitqr.com"
-          className="qp-focusable underline-offset-2 hover:underline"
-          style={{ color: C.textFaint }}
-        >
-          WaitQR
-        </a>{" "}
-        © {new Date().getFullYear()} All rights reserved.
-      </footer>
+      <PageFooter color={C.textFaint} className="qp-ticket-page-footer pt-3" />
       <ConfirmDialog
         confirmAction={exitConfirmOpen ? {
           title: "Are you sure?",

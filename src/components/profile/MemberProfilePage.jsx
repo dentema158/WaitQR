@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { readImageFile } from "../../lib/imageUpload";
 import { normalizeMemberRole } from "../../lib/assignments";
 import { getDeskPath, getMemberProfilePath } from "../../lib/routing";
+import { PageFooter } from "../layout/PageFooter";
 import { NotificationMenu } from "../shared/NotificationMenu";
 
 const THEME_PRESETS = {
@@ -1114,6 +1115,7 @@ export function MemberProfilePage({ member, desks, services, submissions = [], l
           )}
         </div>
       </section>
+      <PageFooter color={`${theme.fontColor}66`} className="mt-auto" />
     </main>
   );
 }

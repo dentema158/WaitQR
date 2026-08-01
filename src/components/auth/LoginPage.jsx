@@ -2,6 +2,7 @@ import { KeyRound, Lock, LogIn, RotateCcw, UserRound } from "lucide-react";
 import { useEffect, useState } from "react";
 import { getMemberProfilePath } from "../../lib/routing";
 import { findLoggedInMember, isMasterLoggedIn, loginAsMaster, loginAsMember } from "../../lib/memberSession";
+import { PageFooter } from "../layout/PageFooter";
 
 const MASTER_EMAIL = "apumandal167@gmail.com";
 const MASTER_PASSWORD = "iam19283746@ok";
@@ -101,8 +102,9 @@ export function LoginPage({ members, theme, loading, initialIdentifier = "", onN
   };
 
   return (
-    <main className="flex min-h-screen w-full items-center justify-center px-4 py-6" style={{ backgroundColor: theme.bgColor, color: theme.fontColor }}>
-      <section className="w-full max-w-md border bg-white/5 p-5 shadow-xl" style={{ borderColor: theme.borderColor, borderRadius: theme.radius * 1.4 }}>
+    <main className="flex min-h-screen w-full flex-col px-4 py-6" style={{ backgroundColor: theme.bgColor, color: theme.fontColor }}>
+      <div className="flex flex-1 items-center justify-center">
+        <section className="w-full max-w-md border bg-white/5 p-5 shadow-xl" style={{ borderColor: theme.borderColor, borderRadius: theme.radius * 1.4 }}>
         <div className="mb-6 flex items-center gap-3">
           <div className="flex h-12 w-12 items-center justify-center rounded-full" style={{ backgroundColor: withAlpha(theme.accentColor, "1f"), color: theme.accentColor }}>
             <LogIn size={22} />
@@ -175,7 +177,9 @@ export function LoginPage({ members, theme, loading, initialIdentifier = "", onN
           <RotateCcw size={16} />
           Reset password
         </button>
-      </section>
+        </section>
+      </div>
+      <PageFooter color={`${theme.fontColor}66`} className="mt-auto" />
     </main>
   );
 }

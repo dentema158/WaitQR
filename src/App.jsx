@@ -15,6 +15,7 @@ import { LoginPage } from "./components/auth/LoginPage";
 import { ResetPasswordPage } from "./components/auth/ResetPasswordPage";
 import { StatsStrip } from "./components/layout/StatsStrip";
 import { BreakdownTabsSection } from "./components/layout/BreakdownTabsSection";
+import { PageFooter } from "./components/layout/PageFooter";
 import { LivePage } from "./components/liveboard/LivePage";
 import { DeskPage } from "./components/deskconsole/DeskPage";
 import { CreatePage } from "./components/kiosk/CreatePage";
@@ -94,55 +95,61 @@ function CounterPermissionDenied({ desk, member, members, theme, onNavigate }) {
   const counterName = counterDisplayName(desk?.name);
   const fallbackPath = member ? getMemberProfilePath(member, members) : "/login";
   return (
-    <main className="flex min-h-screen w-full items-center justify-center px-4 py-6" style={{ backgroundColor: theme.bgColor, color: theme.fontColor }}>
-      <section className="w-full max-w-md border bg-white/5 p-5 text-center" style={{ borderColor: theme.borderColor, borderRadius: theme.radius * 1.4 }}>
-        <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full" style={{ backgroundColor: `${theme.accentColor}1f`, color: theme.accentColor }}>
-          <span className="text-lg font-semibold">!</span>
-        </div>
-        <h1 className="mt-4 text-xl font-semibold" style={{ color: theme.fontColor }}>
-          No permission
-        </h1>
-        <p className="mt-2 text-sm" style={{ color: `${theme.fontColor}cc` }}>
-          You have no permission to access {counterName}.
-        </p>
-        <button
-          type="button"
-          onClick={() => onNavigate?.(fallbackPath)}
-          className="mt-5 inline-flex items-center justify-center px-4 py-2 text-sm font-medium text-white transition-opacity hover:opacity-90"
-          style={{ backgroundColor: theme.accentColor, borderRadius: theme.radius }}
-        >
-          Go back
-        </button>
-      </section>
+    <main className="flex min-h-screen w-full flex-col px-4 py-6" style={{ backgroundColor: theme.bgColor, color: theme.fontColor }}>
+      <div className="flex flex-1 items-center justify-center">
+        <section className="w-full max-w-md border bg-white/5 p-5 text-center" style={{ borderColor: theme.borderColor, borderRadius: theme.radius * 1.4 }}>
+          <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full" style={{ backgroundColor: `${theme.accentColor}1f`, color: theme.accentColor }}>
+            <span className="text-lg font-semibold">!</span>
+          </div>
+          <h1 className="mt-4 text-xl font-semibold" style={{ color: theme.fontColor }}>
+            No permission
+          </h1>
+          <p className="mt-2 text-sm" style={{ color: `${theme.fontColor}cc` }}>
+            You have no permission to access {counterName}.
+          </p>
+          <button
+            type="button"
+            onClick={() => onNavigate?.(fallbackPath)}
+            className="mt-5 inline-flex items-center justify-center px-4 py-2 text-sm font-medium text-white transition-opacity hover:opacity-90"
+            style={{ backgroundColor: theme.accentColor, borderRadius: theme.radius }}
+          >
+            Go back
+          </button>
+        </section>
+      </div>
+      <PageFooter color={`${theme.fontColor}66`} className="mt-auto" />
     </main>
   );
 }
 
 function CounterRoutePlaceholder({ loading, theme, onNavigate }) {
   return (
-    <main className="flex min-h-screen w-full items-center justify-center px-4 py-6" style={{ backgroundColor: theme.bgColor, color: theme.fontColor }}>
-      <section className="w-full max-w-md border bg-white/5 p-5 text-center" style={{ borderColor: theme.borderColor, borderRadius: theme.radius * 1.4 }}>
-        {loading ? (
-          <div className="mx-auto h-9 w-9 animate-spin rounded-full border-2 border-current border-t-transparent opacity-70" />
-        ) : (
-          <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full" style={{ backgroundColor: `${theme.accentColor}1f`, color: theme.accentColor }}>
-            <span className="text-lg font-semibold">?</span>
-          </div>
-        )}
-        <h1 className="mt-4 text-xl font-semibold" style={{ color: theme.fontColor }}>
-          {loading ? "Loading counter..." : "Counter not found"}
-        </h1>
-        {!loading ? (
-          <button
-            type="button"
-            onClick={() => onNavigate?.("/counters")}
-            className="mt-5 inline-flex items-center justify-center px-4 py-2 text-sm font-medium text-white transition-opacity hover:opacity-90"
-            style={{ backgroundColor: theme.accentColor, borderRadius: theme.radius }}
-          >
-            Back to counters
-          </button>
-        ) : null}
-      </section>
+    <main className="flex min-h-screen w-full flex-col px-4 py-6" style={{ backgroundColor: theme.bgColor, color: theme.fontColor }}>
+      <div className="flex flex-1 items-center justify-center">
+        <section className="w-full max-w-md border bg-white/5 p-5 text-center" style={{ borderColor: theme.borderColor, borderRadius: theme.radius * 1.4 }}>
+          {loading ? (
+            <div className="mx-auto h-9 w-9 animate-spin rounded-full border-2 border-current border-t-transparent opacity-70" />
+          ) : (
+            <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full" style={{ backgroundColor: `${theme.accentColor}1f`, color: theme.accentColor }}>
+              <span className="text-lg font-semibold">?</span>
+            </div>
+          )}
+          <h1 className="mt-4 text-xl font-semibold" style={{ color: theme.fontColor }}>
+            {loading ? "Loading counter..." : "Counter not found"}
+          </h1>
+          {!loading ? (
+            <button
+              type="button"
+              onClick={() => onNavigate?.("/counters")}
+              className="mt-5 inline-flex items-center justify-center px-4 py-2 text-sm font-medium text-white transition-opacity hover:opacity-90"
+              style={{ backgroundColor: theme.accentColor, borderRadius: theme.radius }}
+            >
+              Back to counters
+            </button>
+          ) : null}
+        </section>
+      </div>
+      <PageFooter color={`${theme.fontColor}66`} className="mt-auto" />
     </main>
   );
 }
@@ -919,7 +926,6 @@ function getTicketDeskQueueInfo(ticket, { desks, sortedQueue }) {
 export default function App() {
   const initBase = useState(() => Date.now())[0];
   const now = useClock();
-  const currentYear = new Date(now).getFullYear();
   const [pathname, setPathname] = useState(() => window.location.pathname || "/");
   const [search, setSearch] = useState(() => window.location.search || "");
   const [activeDeskPageId, setActiveDeskPageId] = useState(null);
@@ -1569,6 +1575,15 @@ export default function App() {
     setLoggedInMemberState(null);
     setMasterLoggedInState(false);
     navigate("/login");
+  };
+
+  const confirmLogoutMember = () => {
+    askConfirm(
+      "Are you sure?",
+      "You will be logged out of this session.",
+      logoutMember,
+      { confirmLabel: "Logout", variant: "destructive" }
+    );
   };
 
   const saveCurrentSettings = async () => {
@@ -2221,7 +2236,7 @@ export default function App() {
           onMarkNotificationsRead={markCounterNotificationsRead}
           onUpdateMember={memberHooks.updateMember}
           onAppearanceChange={(nextAppearance) => handleActiveThemeChange(nextAppearance?.themeMode)}
-          onLogout={logoutMember}
+          onLogout={confirmLogoutMember}
           onNavigate={navigate}
         />
       ) : currentPage === "desk" && !activeDesk && !adminAuthenticated ? (
@@ -2247,7 +2262,7 @@ export default function App() {
             fullWidth
             onThemeChange={handleActiveThemeChange}
             onNavigate={navigate}
-            onLogout={logoutMember}
+            onLogout={confirmLogoutMember}
           />
           <CounterRoutePlaceholder loading={!settingsLoaded} theme={activeAppearanceSettings} onNavigate={navigate} />
         </div>
@@ -2276,9 +2291,10 @@ export default function App() {
             fullWidth
             onThemeChange={handleActiveThemeChange}
             onNavigate={navigate}
-            onLogout={logoutMember}
+            onLogout={confirmLogoutMember}
           />
           {activeDeskPageContent}
+          <PageFooter color={`${activeAppearanceSettings.fontColor}66`} className="mt-auto" />
         </div>
       ) : currentPage === "create" ? (
         <CreatePage ticketIssuer={ticketIssuer} desks={desks} services={services} labels={labels} />
@@ -2316,7 +2332,7 @@ export default function App() {
           initialIdentifier={authIdentifierFromQuery}
           onUpdateMember={memberHooks.updateMember}
           onAppearanceChange={(nextAppearance) => handleActiveThemeChange(nextAppearance?.themeMode)}
-          onLogout={logoutMember}
+          onLogout={confirmLogoutMember}
           onNavigate={navigate}
         />
       ) : currentPage === "login" ? (
@@ -2357,7 +2373,7 @@ export default function App() {
           notifications={visibleCounterNotifications}
           onClearNotifications={confirmClearCounterNotifications}
           onMarkNotificationsRead={markCounterNotificationsRead}
-          onLogoutMember={logoutMember}
+          onLogoutMember={confirmLogoutMember}
         >
           {(adminTheme) => (
           <div className="flex min-h-0 flex-1 flex-col">
@@ -2410,7 +2426,7 @@ export default function App() {
           onMarkNotificationsRead={markCounterNotificationsRead}
           onUpdateMember={memberHooks.updateMember}
           onAppearanceChange={(nextAppearance) => handleActiveThemeChange(nextAppearance?.themeMode)}
-          onLogout={logoutMember}
+          onLogout={confirmLogoutMember}
           onNavigate={navigate}
         />
       ) : currentPage === "live" ? (
@@ -2531,21 +2547,6 @@ export default function App() {
         </>
       )}
 
-      <div className="mt-auto">
-        <div className="qp-container py-3">
-          <div className="text-center text-[11px] leading-tight" style={{ color: C.textFaint }}>
-            <a
-              href="https://waitqr.com"
-              title="waitqr.com"
-              className="qp-focusable underline-offset-2 hover:underline"
-              style={{ color: C.textFaint }}
-            >
-              WaitQR
-            </a>{" "}
-            © {currentYear} All rights reserved.
-          </div>
-        </div>
-      </div>
       </div>
           )}
         </AdminShell>
