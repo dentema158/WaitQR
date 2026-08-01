@@ -1,14 +1,19 @@
 import { Children, useEffect, useMemo, useRef, useState } from "react";
-import { ArrowLeft, BellRing, CheckCheck, CheckCircle2, ChevronDown, Clock, Copy, MessageCircle, MoreVertical, Phone, Send, SendHorizontal, Signal, Timer, Webhook } from "lucide-react";
+import { ArrowLeft, BellRing, CheckCheck, CheckCircle2, ChevronDown, Clock, Copy, MessageCircle, MoreVertical, Phone, Plus, Send, SendHorizontal, Signal, Timer, Trash2, Webhook } from "lucide-react";
 
 const DEFAULT_TEMPLATES = {
-  created: "Hi {{name}}, your WaitQR ticket {{ticket}} has been created for {{service}}. Track it here: {{ticket_link}}",
-  turnNear: "Hi {{name}}, your turn is near. Ticket {{ticket}} is #{{position}} in line with about {{wait_time}} remaining. {{ticket_link}}",
-  called: "Hi {{name}}, your ticket {{ticket}} is now called at {{counter}}. {{ticket_link}}",
-  absent: "Hi {{name}}, your ticket {{ticket}} was marked absent at {{counter}}. Reply if you need help.",
-  recalled: "Hi {{name}}, your ticket {{ticket}} has been recalled. Please return to {{counter}}.",
-  completed: "Hi {{name}}, your visit for ticket {{ticket}} is complete. Thank you.",
+  created: "Hi *{{name}}*,\n\nYour WaitQR ticket *{{ticket}}* has been created for *{{service}}*.\n\n*Track it here:*\n*{{ticket_link}}*",
+  turnNear: "Hi *{{name}}*,\n\nYour turn is near.\nTicket *{{ticket}}* is #*{{position}}* in line with about *{{wait_time}}* remaining.\n\n*{{ticket_link}}*",
+  called: "Hi *{{name}}*,\n\nYour ticket *{{ticket}}* is now called at *{{counter}}*.\n\n*{{ticket_link}}*",
+  absent: "Hi *{{name}}*,\n\nYour ticket *{{ticket}}* was marked absent at *{{counter}}*.\nReply if you need help.",
+  recalled: "Hi *{{name}}*,\n\nYour ticket *{{ticket}}* has been recalled.\nPlease return to *{{counter}}*.",
+  completed: "Hi *{{name}}*,\n\nYour visit for ticket *{{ticket}}* is complete.\nThank you.",
 };
+
+const TURN_NEAR_DEFAULT_TEMPLATES = [
+  "Hi *{{name}}*,\n\nYou are next.\nTicket *{{ticket}}* is almost ready at *{{counter}}*.\n\n*{{ticket_link}}*",
+  "Hi *{{name}}*,\n\nAlmost there.\nTicket *{{ticket}}* is #*{{position}}* in line with about *{{wait_time}}* remaining.\n\n*{{ticket_link}}*",
+];
 
 const MESSAGE_EVENTS = [
   {
@@ -73,6 +78,21 @@ const TURN_NEAR_MODES = [
   { value: "both", label: "Both" },
 ];
 
+function createTurnNearRule(overrides = {}) {
+  return {
+    id: `turn-near-${Date.now()}-${Math.random().toString(16).slice(2)}`,
+    mode: "both",
+    position: 1,
+    minutes: 10,
+    template: TURN_NEAR_DEFAULT_TEMPLATES[0],
+    ...overrides,
+  };
+}
+
+function turnNearTemplateForIndex(index) {
+  return TURN_NEAR_DEFAULT_TEMPLATES[index] || DEFAULT_TEMPLATES.turnNear;
+}
+
 function withAlpha(hex, alphaHex) {
   if (!hex || hex.length !== 7) return hex;
   return `${hex}${alphaHex}`;
@@ -89,6 +109,26 @@ function focusHandlers(accent, restoreBorderColor) {
       event.target.style.boxShadow = "";
     },
   };
+}
+
+function rangeFromTextarea(textarea) {
+  if (!textarea) return null;
+  const start = textarea.selectionStart ?? 0;
+  const end = textarea.selectionEnd ?? start;
+  return start !== end ? { start, end } : null;
+}
+
+function rangeHasFormat(text, range, { prefix, suffix }) {
+  if (!range) return false;
+  const selectedText = text.slice(range.start, range.end);
+  const selectedHasMarkers = selectedText.startsWith(prefix)
+    && selectedText.endsWith(suffix)
+    && selectedText.length > prefix.length + suffix.length;
+  const surroundingHasMarkers = range.start >= prefix.length
+    && text.slice(range.start - prefix.length, range.start) === prefix
+    && text.slice(range.end, range.end + suffix.length) === suffix;
+
+  return selectedHasMarkers || surroundingHasMarkers;
 }
 
 function useIsNarrow(breakpoint = 640) {
@@ -179,23 +219,36 @@ function Select({ value, onChange, options, accent, fontColor, borderColor, radi
   );
 }
 
-function TextArea({ value, onChange, placeholder, accent, fontColor, borderColor, radius, rows = 4, textareaRef }) {
+function TextArea({ value, onChange, onBlur, onSelect, placeholder, accent, fontColor, borderColor, radius, rows = 4, minHeight = 190, textareaRef, variant = "default" }) {
+  const soft = variant === "soft";
+  const textareaBorderColor = soft ? "rgba(148, 163, 184, 0.28)" : borderColor;
+
   return (
     <textarea
       ref={textareaRef}
       value={value}
       onChange={(event) => onChange(event.target.value)}
+      onSelect={onSelect}
+      onKeyUp={onSelect}
+      onMouseUp={onSelect}
+      onBlur={onBlur}
       placeholder={placeholder}
       rows={rows}
-      {...focusHandlers(accent, borderColor)}
+      {...focusHandlers(accent, textareaBorderColor)}
       className="w-full resize-none border px-3 py-2 text-sm outline-none transition-colors placeholder:text-current placeholder:opacity-40"
-      style={{ color: fontColor, borderColor, borderRadius: radius, backgroundColor: "var(--field-bg)" }}
+      style={{
+        color: fontColor,
+        borderColor: textareaBorderColor,
+        borderRadius: radius,
+        backgroundColor: soft ? "rgba(248,250,252,0.72)" : "var(--field-bg)",
+        minHeight,
+      }}
     />
   );
 }
 
 function DynamicCodeChips({ onInsert, theme }) {
-  const { accentColor, fontColor, borderColor, radius } = theme;
+  const { accentColor, fontColor, radius } = theme;
 
   return (
     <div className="flex flex-wrap gap-1.5">
@@ -204,12 +257,11 @@ function DynamicCodeChips({ onInsert, theme }) {
           key={code}
           type="button"
           onClick={() => onInsert(code)}
-          className="inline-flex min-h-7 items-center gap-1.5 border px-2.5 text-xs font-medium transition-colors hover:bg-white/5"
+          className="inline-flex min-h-6 items-center gap-1.5 px-2 text-[11px] font-semibold transition-opacity hover:opacity-85"
           style={{
             color: accentColor,
-            borderColor,
             borderRadius: Math.max(8, radius),
-            backgroundColor: withAlpha(accentColor, "10"),
+            backgroundColor: "rgba(248,250,252,0.72)",
           }}
           title={`Insert ${code}`}
         >
@@ -221,36 +273,39 @@ function DynamicCodeChips({ onInsert, theme }) {
   );
 }
 
-function FormattingChips({ onFormat, theme }) {
-  const { accentColor, fontColor, borderColor, radius } = theme;
+function FormattingChips({ activeFormats = new Set(), onFormat, theme }) {
+  const { accentColor, fontColor, radius } = theme;
 
   return (
     <div className="flex flex-wrap gap-1.5">
-      {FORMAT_CODES.map((format) => (
-        <button
-          key={format.label}
-          type="button"
-          onClick={() => onFormat(format)}
-          className="inline-flex min-h-7 items-center gap-1.5 border px-2.5 text-xs font-medium transition-colors hover:bg-white/5"
-          style={{
-            color: fontColor,
-            borderColor,
-            borderRadius: Math.max(8, radius),
-            backgroundColor: withAlpha(accentColor, "0c"),
-          }}
-          title={`${format.prefix}${format.sample}${format.suffix}`}
-        >
-          <span>{format.label}</span>
-          <span className="font-mono" style={{ color: withAlpha(fontColor, "99") }}>
-            {format.prefix}{format.sample}{format.suffix}
-          </span>
-        </button>
-      ))}
+      {FORMAT_CODES.map((format) => {
+        const active = activeFormats.has(format.label);
+        return (
+          <button
+            key={format.label}
+            type="button"
+            onMouseDown={(event) => event.preventDefault()}
+            onClick={() => onFormat(format)}
+            className="inline-flex min-h-6 items-center gap-1.5 px-2 text-[11px] font-semibold transition-opacity hover:opacity-85"
+            style={{
+              color: active ? "#ef4444" : fontColor,
+              borderRadius: Math.max(8, radius),
+              backgroundColor: active ? "rgba(239, 68, 68, 0.14)" : "rgba(248,250,252,0.72)",
+            }}
+            title={active ? `Remove ${format.label}` : `${format.prefix}${format.sample}${format.suffix}`}
+          >
+            <span>{format.label}</span>
+            <span className="font-mono" style={{ color: active ? "#ef4444" : withAlpha(fontColor, "99") }}>
+              {format.prefix}{format.sample}{format.suffix}
+            </span>
+          </button>
+        );
+      })}
     </div>
   );
 }
 
-function renderSampleMessage(template) {
+function renderSampleMessage(template, overrides = {}) {
   const samples = {
     "{{name}}": "John Doe",
     "{{ticket}}": "A042",
@@ -260,6 +315,7 @@ function renderSampleMessage(template) {
     "{{counter}}": "Counter 2",
     "{{status}}": "called",
     "{{wait_time}}": "10 min",
+    ...overrides,
   };
 
   return Object.entries(samples).reduce(
@@ -271,41 +327,84 @@ function renderSampleMessage(template) {
 function renderWhatsAppFormattedText(text) {
   const pattern = /(\*[^*\n]+\*|_[^_\n]+_|~[^~\n]+~|```[\s\S]+?```)/g;
   const segments = String(text || "").split(pattern).filter(Boolean);
+  const renderLinks = (value, keyPrefix) => String(value).split(/(https?:\/\/[^\s]+)/g).filter(Boolean).map((part, index) => (
+    /^https?:\/\//.test(part)
+      ? <span key={`${keyPrefix}-${index}`} style={{ color: "#53bdeb" }}>{part}</span>
+      : <span key={`${keyPrefix}-${index}`}>{part}</span>
+  ));
 
   return segments.map((segment, index) => {
     if (segment.startsWith("```") && segment.endsWith("```")) {
-      return <code key={index}>{segment.slice(3, -3)}</code>;
+      return <code key={index}>{renderLinks(segment.slice(3, -3), `code-${index}`)}</code>;
     }
     if (segment.startsWith("*") && segment.endsWith("*")) {
-      return <strong key={index}>{segment.slice(1, -1)}</strong>;
+      return <strong key={index}>{renderLinks(segment.slice(1, -1), `strong-${index}`)}</strong>;
     }
     if (segment.startsWith("_") && segment.endsWith("_")) {
-      return <em key={index}>{segment.slice(1, -1)}</em>;
+      return <em key={index}>{renderLinks(segment.slice(1, -1), `em-${index}`)}</em>;
     }
     if (segment.startsWith("~") && segment.endsWith("~")) {
-      return <del key={index}>{segment.slice(1, -1)}</del>;
+      return <del key={index}>{renderLinks(segment.slice(1, -1), `del-${index}`)}</del>;
     }
-    return <span key={index}>{segment}</span>;
+    return <span key={index}>{renderLinks(segment, `text-${index}`)}</span>;
   });
 }
 
-function WhatsAppPreview({ event, template, theme }) {
+function PreviewBubble({ message, time = "12:45" }) {
+  return (
+    <div className="flex justify-end">
+      <div
+        className="relative max-w-[88%] rounded-bl-xl rounded-br-md rounded-tl-xl rounded-tr-xl px-3.5 py-2.5 text-[13px]"
+        style={{
+          backgroundColor: "#005c4b",
+          color: "#e9edef",
+          lineHeight: 1.48,
+          overflowWrap: "anywhere",
+          whiteSpace: "pre-wrap",
+        }}
+      >
+        <span className="relative z-[1]">{renderWhatsAppFormattedText(message)}</span>
+        <div className="relative z-[1] mt-1.5 flex items-center justify-end gap-1 pl-8 text-[10px] leading-none" style={{ color: "rgba(233,237,239,0.7)" }}>
+          <span>{time}</span>
+          <CheckCheck size={12} />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function WhatsAppPreview({ event, template, theme, turnNearRules = [] }) {
   const { borderColor, radius } = theme;
-  const message = renderSampleMessage(template);
+  const messages = event.key === "turnNear"
+    ? turnNearRules.map((rule) => renderSampleMessage(rule.template || template, {
+      "{{position}}": String(rule.position || 3),
+      "{{wait_time}}": `${rule.minutes || 10} min`,
+    }))
+    : [renderSampleMessage(template)];
 
   return (
     <div
-      className="overflow-hidden border p-1.5 shadow-xl"
+      className="mx-auto overflow-hidden border p-1.5"
       style={{
         width: "min(100%, 18rem)",
+        height: "clamp(32.5rem, 72vh, 42rem)",
+        minHeight: 520,
+        maxHeight: "100%",
         borderColor,
         borderRadius: Math.max(22, radius * 2),
         background: "linear-gradient(145deg, #1f2933, #05070a)",
-        boxShadow: "0 18px 38px rgba(0,0,0,0.22)",
       }}
     >
-      <div className="overflow-hidden" style={{ borderRadius: Math.max(18, radius * 1.6), backgroundColor: "#111b21" }}>
-        <div className="flex h-5 items-center justify-between px-4 text-[9px] font-semibold" style={{ color: "#e9edef", backgroundColor: "#075e54" }}>
+      <div
+        className="flex overflow-hidden"
+        style={{
+          height: "100%",
+          flexDirection: "column",
+          borderRadius: Math.max(18, radius * 1.6),
+          backgroundColor: "#111b21",
+        }}
+      >
+        <div className="flex h-5 items-center justify-between px-4 text-[9px] font-semibold" style={{ color: "#e9edef", backgroundColor: "#202c33" }}>
           <span>12:45</span>
           <span className="flex items-center gap-1">
             <Signal size={10} />
@@ -314,7 +413,7 @@ function WhatsAppPreview({ event, template, theme }) {
             </span>
           </span>
         </div>
-        <div className="flex items-center gap-2 px-3 py-2" style={{ backgroundColor: "#075e54", color: "#ffffff" }}>
+        <div className="flex items-center gap-2 px-3 py-2" style={{ backgroundColor: "#202c33", color: "#ffffff" }}>
           <ArrowLeft size={15} style={{ color: "rgba(255,255,255,0.82)" }} />
           <span className="flex h-8 w-8 items-center justify-center rounded-full text-xs font-semibold" style={{ backgroundColor: "#25D366" }}>
             W
@@ -328,36 +427,25 @@ function WhatsAppPreview({ event, template, theme }) {
           <MoreVertical size={15} style={{ color: "rgba(255,255,255,0.78)" }} />
         </div>
         <div
-          className="relative min-h-64 py-3 pl-3 pr-3"
+          className="relative min-h-0 flex-1 py-3 pl-3 pr-3"
           style={{
             backgroundColor: "#0b141a",
             backgroundImage: "radial-gradient(circle at 16px 16px, rgba(255,255,255,0.035) 1px, transparent 1px)",
             backgroundSize: "18px 18px",
+            overflowX: "hidden",
+            overflowY: "auto",
           }}
         >
           <div className="mx-auto mb-3 w-max rounded-full px-2.5 py-1 text-[10px]" style={{ color: "#8696a0", backgroundColor: "rgba(34,46,53,0.92)" }}>
             Today
           </div>
-          <div className="flex justify-end">
-            <div
-              className="relative max-w-[88%] rounded-bl-xl rounded-br-md rounded-tl-xl rounded-tr-xl px-3.5 py-2.5 text-[13px]"
-              style={{
-                backgroundColor: "#005c4b",
-                color: "#e9edef",
-                lineHeight: 1.48,
-                overflowWrap: "anywhere",
-                whiteSpace: "pre-wrap",
-              }}
-            >
-              <span className="relative z-[1]">{renderWhatsAppFormattedText(message)}</span>
-              <div className="relative z-[1] mt-1.5 flex items-center justify-end gap-1 pl-8 text-[10px] leading-none" style={{ color: "rgba(233,237,239,0.7)" }}>
-                <span>12:45</span>
-                <CheckCheck size={12} />
-              </div>
-            </div>
+          <div className="space-y-2">
+            {messages.map((message, index) => (
+              <PreviewBubble key={`${message}-${index}`} message={message} time={`12:${45 + index}`} />
+            ))}
           </div>
         </div>
-        <div className="flex items-center gap-1.5 px-2 py-2" style={{ backgroundColor: "#0b141a" }}>
+        <div className="flex shrink-0 items-center gap-1.5 px-2 py-2" style={{ backgroundColor: "#0b141a" }}>
           <div className="flex h-8 min-w-0 flex-1 items-center px-3 text-[10px]" style={{ color: "#8696a0", backgroundColor: "#202c33", borderRadius: 999 }}>
             Message
           </div>
@@ -365,7 +453,7 @@ function WhatsAppPreview({ event, template, theme }) {
             <SendHorizontal size={14} fill="currentColor" strokeWidth={1.5} />
           </span>
         </div>
-        <div className="flex justify-center pb-2" style={{ backgroundColor: "#0b141a" }}>
+        <div className="flex shrink-0 justify-center pb-2" style={{ backgroundColor: "#0b141a" }}>
           <span className="h-1 w-20 rounded-full" style={{ backgroundColor: "rgba(233,237,239,0.42)" }} />
         </div>
       </div>
@@ -434,65 +522,301 @@ function StatusPill({ ready, theme }) {
   );
 }
 
-function TurnNearSetup({ settings, onChange, theme }) {
+function TurnNearRule({ rule, canRemove, onChange, onRemove, theme }) {
   const { accentColor, fontColor, borderColor, radius } = theme;
-  const showPosition = settings.mode === "position" || settings.mode === "both";
-  const showMinutes = settings.mode === "time" || settings.mode === "both";
+  const textareaRef = useRef(null);
+  const formattingHostRef = useRef(null);
+  const [hasTextSelection, setHasTextSelection] = useState(false);
+  const [activeTextRange, setActiveTextRange] = useState(null);
+  const showPosition = rule.mode === "position" || rule.mode === "both";
+  const showMinutes = rule.mode === "time" || rule.mode === "both";
+  const template = rule.template || "";
+
+  const syncTextSelection = () => {
+    const range = rangeFromTextarea(textareaRef.current);
+    setActiveTextRange(range);
+    setHasTextSelection(Boolean(range));
+  };
+  const hideFormatting = () => {
+    setActiveTextRange(null);
+    setHasTextSelection(false);
+  };
+  const activeFormats = new Set(FORMAT_CODES.filter((format) => rangeHasFormat(template, activeTextRange, format)).map((format) => format.label));
+
+  useEffect(() => {
+    if (!hasTextSelection) return undefined;
+
+    const handlePointerDown = (event) => {
+      if (formattingHostRef.current?.contains(event.target)) return;
+      hideFormatting();
+    };
+    const handleSelectionChange = () => {
+      if (document.activeElement !== textareaRef.current) {
+        hideFormatting();
+        return;
+      }
+      syncTextSelection();
+    };
+
+    document.addEventListener("pointerdown", handlePointerDown);
+    document.addEventListener("selectionchange", handleSelectionChange);
+    return () => {
+      document.removeEventListener("pointerdown", handlePointerDown);
+      document.removeEventListener("selectionchange", handleSelectionChange);
+    };
+  }, [hasTextSelection, template]);
+
+  const updateTemplate = (nextTemplate) => onChange({ ...rule, template: nextTemplate });
+  const insertDynamicCode = (code) => {
+    const textarea = textareaRef.current;
+    const start = textarea?.selectionStart ?? template.length;
+    const end = textarea?.selectionEnd ?? template.length;
+    const spacerBefore = start > 0 && !/\s$/.test(template.slice(0, start)) ? " " : "";
+    const spacerAfter = end < template.length && !/^\s/.test(template.slice(end)) ? " " : "";
+    const insertText = `${spacerBefore}${code}${spacerAfter}`;
+    const nextTemplate = `${template.slice(0, start)}${insertText}${template.slice(end)}`;
+    const nextCaret = start + insertText.length;
+
+    updateTemplate(nextTemplate);
+    window.requestAnimationFrame(() => {
+      textarea?.focus();
+      textarea?.setSelectionRange(nextCaret, nextCaret);
+    });
+  };
+  const applyFormatting = ({ prefix, suffix, sample }) => {
+    const textarea = textareaRef.current;
+    const selectedRange = textarea && textarea.selectionStart !== textarea.selectionEnd
+      ? { start: textarea.selectionStart, end: textarea.selectionEnd }
+      : activeTextRange;
+    const start = selectedRange?.start ?? template.length;
+    const end = selectedRange?.end ?? template.length;
+    const selectedText = template.slice(start, end) || sample;
+    const selectedHasMarkers = selectedText.startsWith(prefix) && selectedText.endsWith(suffix) && selectedText.length > prefix.length + suffix.length;
+    const surroundingHasMarkers = rangeHasFormat(template, { start, end }, { prefix, suffix }) && !selectedHasMarkers;
+    let nextTemplate;
+    let selectionStart;
+    let selectionEnd;
+
+    if (selectedHasMarkers) {
+      const unwrappedText = selectedText.slice(prefix.length, selectedText.length - suffix.length);
+      nextTemplate = `${template.slice(0, start)}${unwrappedText}${template.slice(end)}`;
+      selectionStart = start;
+      selectionEnd = start + unwrappedText.length;
+    } else if (surroundingHasMarkers) {
+      nextTemplate = `${template.slice(0, start - prefix.length)}${selectedText}${template.slice(end + suffix.length)}`;
+      selectionStart = start - prefix.length;
+      selectionEnd = selectionStart + selectedText.length;
+    } else {
+      const replacement = `${prefix}${selectedText}${suffix}`;
+      nextTemplate = `${template.slice(0, start)}${replacement}${template.slice(end)}`;
+      selectionStart = start + prefix.length;
+      selectionEnd = selectionStart + selectedText.length;
+    }
+
+    updateTemplate(nextTemplate);
+    setActiveTextRange({ start: selectionStart, end: selectionEnd });
+    setHasTextSelection(true);
+    window.requestAnimationFrame(() => {
+      textarea?.focus();
+      textarea?.setSelectionRange(selectionStart, selectionEnd);
+    });
+  };
 
   return (
-    <div className={`mb-3 grid gap-3 ${settings.mode === "both" ? "sm:grid-cols-3" : "sm:grid-cols-2"}`}>
-      <label className="min-w-0">
-        <span className="mb-1.5 block text-xs font-medium" style={{ color: withAlpha(fontColor, "99") }}>
-          Notify By
-        </span>
-        <Select
-          value={settings.mode}
-          onChange={(value) => onChange({ ...settings, mode: value })}
-          options={TURN_NEAR_MODES}
-          accent={accentColor}
-          fontColor={fontColor}
-          borderColor={borderColor}
-          radius={radius}
-        />
-      </label>
-      {showPosition ? (
+    <div
+      className="space-y-3 border p-3"
+      style={{
+        borderColor: withAlpha(borderColor, "99"),
+        borderRadius: Math.max(10, radius),
+        backgroundColor: "rgba(15,23,42,0.04)",
+      }}
+    >
+      <div className={`grid gap-3 ${rule.mode === "both" ? "sm:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)_auto_minmax(0,1fr)_auto]" : "sm:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)_auto]"}`}>
+        <label className="min-w-0">
+          <span className="mb-1.5 block text-xs font-medium" style={{ color: withAlpha(fontColor, "99") }}>
+            Notify By
+          </span>
+          <Select
+            value={rule.mode}
+            onChange={(value) => onChange({ ...rule, mode: value })}
+            options={TURN_NEAR_MODES}
+            accent={accentColor}
+            fontColor={fontColor}
+            borderColor={borderColor}
+            radius={radius}
+          />
+        </label>
+        <div className="flex items-end justify-center pb-2 text-xs font-semibold" style={{ color: withAlpha(fontColor, "80") }}>
+          if
+        </div>
+        {showPosition ? (
         <label className="min-w-0">
           <span className="mb-1.5 block text-xs font-medium" style={{ color: withAlpha(fontColor, "99") }}>
             Position
           </span>
           <NumberInput
-            value={settings.position}
-            onChange={(value) => onChange({ ...settings, position: value })}
+            value={rule.position}
+            onChange={(value) => onChange({ ...rule, position: value })}
             accent={accentColor}
             fontColor={fontColor}
             borderColor={borderColor}
             radius={radius}
           />
         </label>
-      ) : null}
-      {showMinutes ? (
+        ) : null}
+        {rule.mode === "both" ? (
+          <div className="flex items-end justify-center pb-2 text-xs font-semibold" style={{ color: withAlpha(fontColor, "80") }}>
+            and
+          </div>
+        ) : null}
+        {showMinutes ? (
         <label className="min-w-0">
           <span className="mb-1.5 block text-xs font-medium" style={{ color: withAlpha(fontColor, "99") }}>
             Minutes
           </span>
           <NumberInput
-            value={settings.minutes}
-            onChange={(value) => onChange({ ...settings, minutes: value })}
+            value={rule.minutes}
+            onChange={(value) => onChange({ ...rule, minutes: value })}
             accent={accentColor}
             fontColor={fontColor}
             borderColor={borderColor}
             radius={radius}
           />
         </label>
-      ) : null}
+        ) : null}
+        <div className="flex items-end justify-end pb-0.5">
+          <button
+            type="button"
+            onClick={onRemove}
+            disabled={!canRemove}
+            className="flex h-9 w-9 items-center justify-center transition-opacity hover:opacity-80 disabled:cursor-default disabled:opacity-30"
+            style={{ color: "#ef4444", borderRadius: radius, backgroundColor: "rgba(239, 68, 68, 0.1)" }}
+            aria-label="Remove turn near rule"
+            title="Remove rule"
+          >
+            <Trash2 size={14} />
+          </button>
+        </div>
+      </div>
+      <div ref={formattingHostRef} className="block min-w-0">
+        <span className="mb-1.5 block text-xs font-medium" style={{ color: withAlpha(fontColor, "99") }}>
+          Message template
+        </span>
+        <TextArea
+          textareaRef={textareaRef}
+          value={template}
+          onChange={updateTemplate}
+          onBlur={hideFormatting}
+          onSelect={syncTextSelection}
+          placeholder="Write the WhatsApp message for this rule"
+          accent={accentColor}
+          fontColor={fontColor}
+          borderColor={borderColor}
+          radius={radius}
+          rows={7}
+          variant="soft"
+        />
+        {hasTextSelection ? (
+          <>
+            <p className="mb-1.5 mt-2 text-xs font-medium" style={{ color: withAlpha(fontColor, "99") }}>
+              WhatsApp formatting
+            </p>
+            <FormattingChips activeFormats={activeFormats} onFormat={applyFormatting} theme={theme} />
+          </>
+        ) : null}
+        <p className="mb-1.5 mt-2 text-xs font-medium" style={{ color: withAlpha(fontColor, "99") }}>
+          Dynamic values
+        </p>
+        <DynamicCodeChips onInsert={insertDynamicCode} theme={theme} />
+      </div>
     </div>
   );
 }
 
-function MessageTriggerField({ event, checked, template, onToggle, onTemplateChange, theme, turnNearSettings, onTurnNearSettingsChange }) {
+function TurnNearSetup({ rules, onChange, theme }) {
+  const { accentColor, fontColor, radius } = theme;
+
+  const updateRule = (nextRule) => onChange(rules.map((rule) => (rule.id === nextRule.id ? nextRule : rule)));
+  const removeRule = (ruleId) => {
+    if (rules.length <= 1) return;
+    onChange(rules.filter((rule) => rule.id !== ruleId));
+  };
+  const addRule = () => {
+    onChange([
+      ...rules,
+      createTurnNearRule({
+        position: Number(rules.at(-1)?.position || 1) + 1,
+        template: turnNearTemplateForIndex(rules.length),
+      }),
+    ]);
+  };
+
+  return (
+    <div className="mb-3 space-y-3">
+      {rules.map((rule) => (
+        <TurnNearRule
+          key={rule.id}
+          rule={rule}
+          canRemove={rules.length > 1}
+          onChange={updateRule}
+          onRemove={() => removeRule(rule.id)}
+          theme={theme}
+        />
+      ))}
+      <button
+        type="button"
+        onClick={addRule}
+        className="inline-flex min-h-8 items-center gap-2 px-3 text-xs font-semibold transition-opacity hover:opacity-85"
+        style={{ color: accentColor, borderRadius: Math.max(8, radius), backgroundColor: withAlpha(accentColor, "14") }}
+      >
+        <Plus size={14} />
+        Add rule
+      </button>
+    </div>
+  );
+}
+
+function MessageTriggerField({ event, checked, template, onToggle, onTemplateChange, theme, turnNearRules, onTurnNearRulesChange }) {
   const Icon = event.icon;
   const { accentColor, fontColor, borderColor, radius } = theme;
   const textareaRef = useRef(null);
+  const formattingHostRef = useRef(null);
+  const [hasTextSelection, setHasTextSelection] = useState(false);
+  const [activeTextRange, setActiveTextRange] = useState(null);
+
+  const syncTextSelection = () => {
+    const range = rangeFromTextarea(textareaRef.current);
+    setActiveTextRange(range);
+    setHasTextSelection(Boolean(range));
+  };
+  const hideFormatting = () => {
+    setActiveTextRange(null);
+    setHasTextSelection(false);
+  };
+  const activeFormats = new Set(FORMAT_CODES.filter((format) => rangeHasFormat(template, activeTextRange, format)).map((format) => format.label));
+
+  useEffect(() => {
+    if (!hasTextSelection) return undefined;
+
+    const handlePointerDown = (event) => {
+      if (formattingHostRef.current?.contains(event.target)) return;
+      hideFormatting();
+    };
+    const handleSelectionChange = () => {
+      if (document.activeElement !== textareaRef.current) {
+        hideFormatting();
+        return;
+      }
+      syncTextSelection();
+    };
+
+    document.addEventListener("pointerdown", handlePointerDown);
+    document.addEventListener("selectionchange", handleSelectionChange);
+    return () => {
+      document.removeEventListener("pointerdown", handlePointerDown);
+      document.removeEventListener("selectionchange", handleSelectionChange);
+    };
+  }, [hasTextSelection]);
 
   const insertDynamicCode = (code) => {
     const textarea = textareaRef.current;
@@ -513,15 +837,37 @@ function MessageTriggerField({ event, checked, template, onToggle, onTemplateCha
 
   const applyFormatting = ({ prefix, suffix, sample }) => {
     const textarea = textareaRef.current;
-    const start = textarea?.selectionStart ?? template.length;
-    const end = textarea?.selectionEnd ?? template.length;
+    const selectedRange = textarea && textarea.selectionStart !== textarea.selectionEnd
+      ? { start: textarea.selectionStart, end: textarea.selectionEnd }
+      : activeTextRange;
+    const start = selectedRange?.start ?? template.length;
+    const end = selectedRange?.end ?? template.length;
     const selectedText = template.slice(start, end) || sample;
-    const replacement = `${prefix}${selectedText}${suffix}`;
-    const nextTemplate = `${template.slice(0, start)}${replacement}${template.slice(end)}`;
-    const selectionStart = start + prefix.length;
-    const selectionEnd = selectionStart + selectedText.length;
+    const selectedHasMarkers = selectedText.startsWith(prefix) && selectedText.endsWith(suffix) && selectedText.length > prefix.length + suffix.length;
+    const surroundingHasMarkers = rangeHasFormat(template, { start, end }, { prefix, suffix }) && !selectedHasMarkers;
+    let nextTemplate;
+    let selectionStart;
+    let selectionEnd;
+
+    if (selectedHasMarkers) {
+      const unwrappedText = selectedText.slice(prefix.length, selectedText.length - suffix.length);
+      nextTemplate = `${template.slice(0, start)}${unwrappedText}${template.slice(end)}`;
+      selectionStart = start;
+      selectionEnd = start + unwrappedText.length;
+    } else if (surroundingHasMarkers) {
+      nextTemplate = `${template.slice(0, start - prefix.length)}${selectedText}${template.slice(end + suffix.length)}`;
+      selectionStart = start - prefix.length;
+      selectionEnd = selectionStart + selectedText.length;
+    } else {
+      const replacement = `${prefix}${selectedText}${suffix}`;
+      nextTemplate = `${template.slice(0, start)}${replacement}${template.slice(end)}`;
+      selectionStart = start + prefix.length;
+      selectionEnd = selectionStart + selectedText.length;
+    }
 
     onTemplateChange(nextTemplate);
+    setActiveTextRange({ start: selectionStart, end: selectionEnd });
+    setHasTextSelection(true);
     window.requestAnimationFrame(() => {
       textarea?.focus();
       textarea?.setSelectionRange(selectionStart, selectionEnd);
@@ -551,37 +897,55 @@ function MessageTriggerField({ event, checked, template, onToggle, onTemplateCha
       </div>
 
       {checked ? (
-        <div className="mt-4 pl-0 sm:pl-11">
+        <div className="mt-4">
           <div className="grid gap-3 xl:grid-cols-[minmax(0,1fr)_minmax(14rem,0.7fr)]">
-            <div className="min-w-0">
+            <div ref={formattingHostRef} className="min-w-0 sm:pl-11 xl:pl-0">
               {event.key === "turnNear" ? (
-                <TurnNearSetup settings={turnNearSettings} onChange={onTurnNearSettingsChange} theme={theme} />
+                <TurnNearSetup rules={turnNearRules} onChange={onTurnNearRulesChange} theme={theme} />
               ) : null}
-              <p className="mb-1.5 text-xs font-medium" style={{ color: withAlpha(fontColor, "99") }}>
-                Message template
-              </p>
-              <TextArea
-                textareaRef={textareaRef}
-                value={template}
-                onChange={onTemplateChange}
-                placeholder="Write the WhatsApp message for this event"
-                accent={accentColor}
-                fontColor={fontColor}
-                borderColor={borderColor}
-                radius={radius}
-                rows={3}
-              />
-              <p className="mb-1.5 mt-2 text-xs font-medium" style={{ color: withAlpha(fontColor, "99") }}>
-                Dynamic codes
-              </p>
-              <DynamicCodeChips onInsert={insertDynamicCode} theme={theme} />
-              <p className="mb-1.5 mt-2 text-xs font-medium" style={{ color: withAlpha(fontColor, "99") }}>
-                WhatsApp formatting
-              </p>
-              <FormattingChips onFormat={applyFormatting} theme={theme} />
+              {event.key !== "turnNear" ? (
+                <div
+                  className="space-y-3 border p-3"
+                  style={{
+                    borderColor: withAlpha(borderColor, "99"),
+                    borderRadius: Math.max(10, radius),
+                    backgroundColor: "rgba(15,23,42,0.04)",
+                  }}
+                >
+                  <p className="mb-1.5 text-xs font-medium" style={{ color: withAlpha(fontColor, "99") }}>
+                    Message template
+                  </p>
+                  <TextArea
+                    textareaRef={textareaRef}
+                    value={template}
+                    onChange={onTemplateChange}
+                    onBlur={hideFormatting}
+                    onSelect={syncTextSelection}
+                    placeholder="Write the WhatsApp message for this event"
+                    accent={accentColor}
+                    fontColor={fontColor}
+                    borderColor={borderColor}
+                    radius={radius}
+                    rows={7}
+                    variant="soft"
+                  />
+                  {hasTextSelection ? (
+                    <>
+                      <p className="mb-1.5 mt-2 text-xs font-medium" style={{ color: withAlpha(fontColor, "99") }}>
+                        WhatsApp formatting
+                      </p>
+                      <FormattingChips activeFormats={activeFormats} onFormat={applyFormatting} theme={theme} />
+                    </>
+                  ) : null}
+                  <p className="mb-1.5 mt-2 text-xs font-medium" style={{ color: withAlpha(fontColor, "99") }}>
+                    Dynamic values
+                  </p>
+                  <DynamicCodeChips onInsert={insertDynamicCode} theme={theme} />
+                </div>
+              ) : null}
             </div>
-            <div className="min-w-0">
-              <WhatsAppPreview event={event} template={template} theme={theme} />
+            <div className="flex min-w-0 self-stretch justify-center xl:justify-end">
+              <WhatsAppPreview event={event} template={template} theme={theme} turnNearRules={turnNearRules} />
             </div>
           </div>
         </div>
@@ -607,11 +971,7 @@ export function AdminIntegrationsPage({ theme }) {
     completed: false,
   });
   const [templates, setTemplates] = useState(DEFAULT_TEMPLATES);
-  const [turnNearSettings, setTurnNearSettings] = useState({
-    mode: "both",
-    position: 3,
-    minutes: 10,
-  });
+  const [turnNearRules, setTurnNearRules] = useState(() => [createTurnNearRule()]);
 
   const webhookUrl = useMemo(() => {
     if (typeof window === "undefined") return "/api/integrations/twilio/whatsapp/webhook";
@@ -622,11 +982,13 @@ export function AdminIntegrationsPage({ theme }) {
 
   const updateEvent = (key) => (value) => setEvents((current) => ({ ...current, [key]: value }));
   const updateTemplate = (key) => (value) => setTemplates((current) => ({ ...current, [key]: value }));
-  const turnNearSummary = turnNearSettings.mode === "position"
-    ? `Position ${turnNearSettings.position}`
-    : turnNearSettings.mode === "time"
-      ? `${turnNearSettings.minutes} min`
-      : `Position ${turnNearSettings.position} or ${turnNearSettings.minutes} min`;
+  const turnNearSummary = turnNearRules.map((rule) => (
+    rule.mode === "position"
+      ? `if position ${rule.position}`
+      : rule.mode === "time"
+        ? `if ${rule.minutes} min`
+        : `if position ${rule.position} and ${rule.minutes} min`
+  )).join(" | ");
 
   return (
     <div className="space-y-4 px-2.5 py-2.5 sm:space-y-6 sm:px-6 sm:py-6 md:pl-10 md:pr-6" style={{ "--field-bg": "var(--surface-bg)" }}>
@@ -711,8 +1073,8 @@ export function AdminIntegrationsPage({ theme }) {
             onToggle={updateEvent(event.key)}
             onTemplateChange={updateTemplate(event.key)}
             theme={theme}
-            turnNearSettings={turnNearSettings}
-            onTurnNearSettingsChange={setTurnNearSettings}
+            turnNearRules={turnNearRules}
+            onTurnNearRulesChange={setTurnNearRules}
           />
         ))}
       </SectionCard>
