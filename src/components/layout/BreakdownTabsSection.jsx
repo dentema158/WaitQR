@@ -47,7 +47,7 @@ export function BreakdownTabsSection({
     borderColor: C.hair,
   };
   const selectorOptions = [
-    { key: "desks", label: "Desks", count: desks.length, icon: LayoutGrid },
+    { key: "desks", label: "Counters", count: desks.length, icon: LayoutGrid },
     { key: "services", label: "Services", count: services.length, icon: Tag },
   ];
   const activeOption = selectorOptions.find((option) => option.key === activeTab) || selectorOptions[0];
@@ -126,7 +126,7 @@ export function BreakdownTabsSection({
             style={{ color: withAlpha(palette.fontColor, "80") }}
           >
             <activeOption.icon size={13} />
-            <span>{activeOption.key === "desks" ? `${labels.deskWord} breakdown` : `${labels.serviceWord} breakdown`}</span>
+            <span>{activeOption.label}</span>
             <ChevronDown size={12} style={{ color: withAlpha(palette.fontColor, "70"), transform: selectorOpen ? "rotate(180deg)" : "rotate(0deg)", transition: "transform 160ms ease" }} />
           </button>
 

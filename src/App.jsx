@@ -2386,7 +2386,7 @@ export default function App() {
             joinedToday={issuedToday}
             totalServed={servedToday}
             servedDeskCount={servedDeskCount}
-            servedDeskLabel={`Served ${labels.deskWordPlural}`}
+            servedDeskLabel="Served Counters"
             waitingNow={waitingNow}
             theme={adminTheme}
           />
