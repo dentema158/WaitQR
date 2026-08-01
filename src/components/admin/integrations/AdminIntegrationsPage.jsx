@@ -1,10 +1,11 @@
 import { Children, useEffect, useMemo, useRef, useState } from "react";
-import { BellRing, CheckCircle2, Clock, Copy, MessageCircle, Phone, Send, Timer, Webhook } from "lucide-react";
+import { ArrowLeft, BellRing, CheckCheck, CheckCircle2, ChevronDown, Clock, Copy, MessageCircle, MoreVertical, Phone, Send, SendHorizontal, Signal, Timer, Webhook } from "lucide-react";
 
 const DEFAULT_TEMPLATES = {
-  created: "Hi {{name}}, your WaitQR ticket {{ticket}} has been created for {{service}}.",
-  turnNear: "Hi {{name}}, your turn is near. Ticket {{ticket}} is #{{position}} in line with about {{wait_time}} remaining.",
-  called: "Hi {{name}}, your ticket {{ticket}} is now called at {{counter}}.",
+  created: "Hi {{name}}, your WaitQR ticket {{ticket}} has been created for {{service}}. Track it here: {{ticket_link}}",
+  turnNear: "Hi {{name}}, your turn is near. Ticket {{ticket}} is #{{position}} in line with about {{wait_time}} remaining. {{ticket_link}}",
+  called: "Hi {{name}}, your ticket {{ticket}} is now called at {{counter}}. {{ticket_link}}",
+  absent: "Hi {{name}}, your ticket {{ticket}} was marked absent at {{counter}}. Reply if you need help.",
   recalled: "Hi {{name}}, your ticket {{ticket}} has been recalled. Please return to {{counter}}.",
   completed: "Hi {{name}}, your visit for ticket {{ticket}} is complete. Thank you.",
 };
@@ -29,6 +30,12 @@ const MESSAGE_EVENTS = [
     hint: "Notify guests when a counter calls their ticket",
   },
   {
+    key: "absent",
+    icon: BellRing,
+    label: "Ticket Absent",
+    hint: "Notify guests when their missed ticket is marked absent",
+  },
+  {
     key: "recalled",
     icon: Send,
     label: "Ticket Recalled",
@@ -45,11 +52,19 @@ const MESSAGE_EVENTS = [
 const DYNAMIC_CODES = [
   { code: "{{name}}", label: "Name" },
   { code: "{{ticket}}", label: "Ticket" },
+  { code: "{{ticket_link}}", label: "Ticket Link" },
   { code: "{{position}}", label: "Position" },
   { code: "{{service}}", label: "Service" },
   { code: "{{counter}}", label: "Counter" },
   { code: "{{status}}", label: "Status" },
   { code: "{{wait_time}}", label: "Wait Time" },
+];
+
+const FORMAT_CODES = [
+  { label: "Bold", prefix: "*", suffix: "*", sample: "text" },
+  { label: "Italic", prefix: "_", suffix: "_", sample: "text" },
+  { label: "Strike", prefix: "~", suffix: "~", sample: "text" },
+  { label: "Mono", prefix: "```", suffix: "```", sample: "text" },
 ];
 
 const TURN_NEAR_MODES = [
@@ -141,19 +156,26 @@ function NumberInput({ value, onChange, min = 1, accent, fontColor, borderColor,
 
 function Select({ value, onChange, options, accent, fontColor, borderColor, radius }) {
   return (
-    <select
-      value={value}
-      onChange={(event) => onChange(event.target.value)}
-      {...focusHandlers(accent, borderColor)}
-      className="w-full border px-3 py-2 text-sm outline-none transition-colors"
-      style={{ color: fontColor, borderColor, borderRadius: radius, backgroundColor: "var(--field-bg)" }}
-    >
-      {options.map((option) => (
-        <option key={option.value} value={option.value}>
-          {option.label}
-        </option>
-      ))}
-    </select>
+    <div className="relative">
+      <select
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        {...focusHandlers(accent, borderColor)}
+        className="w-full appearance-none border px-3 py-2 pr-9 text-sm outline-none transition-colors"
+        style={{ color: fontColor, borderColor, borderRadius: radius, backgroundColor: "var(--field-bg)" }}
+      >
+        {options.map((option) => (
+          <option key={option.value} value={option.value} style={{ color: "#0f172a" }}>
+            {option.label}
+          </option>
+        ))}
+      </select>
+      <ChevronDown
+        size={16}
+        className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2"
+        style={{ color: withAlpha(fontColor, "80") }}
+      />
+    </div>
   );
 }
 
@@ -176,7 +198,7 @@ function DynamicCodeChips({ onInsert, theme }) {
   const { accentColor, fontColor, borderColor, radius } = theme;
 
   return (
-    <div className="mt-2 flex flex-wrap gap-1.5">
+    <div className="flex flex-wrap gap-1.5">
       {DYNAMIC_CODES.map(({ code, label }) => (
         <button
           key={code}
@@ -195,6 +217,158 @@ function DynamicCodeChips({ onInsert, theme }) {
           <span className="font-mono">{code}</span>
         </button>
       ))}
+    </div>
+  );
+}
+
+function FormattingChips({ onFormat, theme }) {
+  const { accentColor, fontColor, borderColor, radius } = theme;
+
+  return (
+    <div className="flex flex-wrap gap-1.5">
+      {FORMAT_CODES.map((format) => (
+        <button
+          key={format.label}
+          type="button"
+          onClick={() => onFormat(format)}
+          className="inline-flex min-h-7 items-center gap-1.5 border px-2.5 text-xs font-medium transition-colors hover:bg-white/5"
+          style={{
+            color: fontColor,
+            borderColor,
+            borderRadius: Math.max(8, radius),
+            backgroundColor: withAlpha(accentColor, "0c"),
+          }}
+          title={`${format.prefix}${format.sample}${format.suffix}`}
+        >
+          <span>{format.label}</span>
+          <span className="font-mono" style={{ color: withAlpha(fontColor, "99") }}>
+            {format.prefix}{format.sample}{format.suffix}
+          </span>
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function renderSampleMessage(template) {
+  const samples = {
+    "{{name}}": "John Doe",
+    "{{ticket}}": "A042",
+    "{{ticket_link}}": "https://waitqr.com/t/A042",
+    "{{position}}": "3",
+    "{{service}}": "General Service",
+    "{{counter}}": "Counter 2",
+    "{{status}}": "called",
+    "{{wait_time}}": "10 min",
+  };
+
+  return Object.entries(samples).reduce(
+    (message, [code, value]) => message.split(code).join(value),
+    template || "No message template yet."
+  );
+}
+
+function renderWhatsAppFormattedText(text) {
+  const pattern = /(\*[^*\n]+\*|_[^_\n]+_|~[^~\n]+~|```[\s\S]+?```)/g;
+  const segments = String(text || "").split(pattern).filter(Boolean);
+
+  return segments.map((segment, index) => {
+    if (segment.startsWith("```") && segment.endsWith("```")) {
+      return <code key={index}>{segment.slice(3, -3)}</code>;
+    }
+    if (segment.startsWith("*") && segment.endsWith("*")) {
+      return <strong key={index}>{segment.slice(1, -1)}</strong>;
+    }
+    if (segment.startsWith("_") && segment.endsWith("_")) {
+      return <em key={index}>{segment.slice(1, -1)}</em>;
+    }
+    if (segment.startsWith("~") && segment.endsWith("~")) {
+      return <del key={index}>{segment.slice(1, -1)}</del>;
+    }
+    return <span key={index}>{segment}</span>;
+  });
+}
+
+function WhatsAppPreview({ event, template, theme }) {
+  const { borderColor, radius } = theme;
+  const message = renderSampleMessage(template);
+
+  return (
+    <div
+      className="overflow-hidden border p-1.5 shadow-xl"
+      style={{
+        width: "min(100%, 18rem)",
+        borderColor,
+        borderRadius: Math.max(22, radius * 2),
+        background: "linear-gradient(145deg, #1f2933, #05070a)",
+        boxShadow: "0 18px 38px rgba(0,0,0,0.22)",
+      }}
+    >
+      <div className="overflow-hidden" style={{ borderRadius: Math.max(18, radius * 1.6), backgroundColor: "#111b21" }}>
+        <div className="flex h-5 items-center justify-between px-4 text-[9px] font-semibold" style={{ color: "#e9edef", backgroundColor: "#075e54" }}>
+          <span>12:45</span>
+          <span className="flex items-center gap-1">
+            <Signal size={10} />
+            <span className="h-1.5 w-3.5 rounded-sm border border-current">
+              <span className="block h-full w-2.5 rounded-[1px] bg-current" />
+            </span>
+          </span>
+        </div>
+        <div className="flex items-center gap-2 px-3 py-2" style={{ backgroundColor: "#075e54", color: "#ffffff" }}>
+          <ArrowLeft size={15} style={{ color: "rgba(255,255,255,0.82)" }} />
+          <span className="flex h-8 w-8 items-center justify-center rounded-full text-xs font-semibold" style={{ backgroundColor: "#25D366" }}>
+            W
+          </span>
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-xs font-semibold">WhatsApp preview</p>
+            <p className="text-[10px]" style={{ color: "rgba(255,255,255,0.72)" }}>
+              Uses sample ticket data
+            </p>
+          </div>
+          <MoreVertical size={15} style={{ color: "rgba(255,255,255,0.78)" }} />
+        </div>
+        <div
+          className="relative min-h-64 py-3 pl-3 pr-3"
+          style={{
+            backgroundColor: "#0b141a",
+            backgroundImage: "radial-gradient(circle at 16px 16px, rgba(255,255,255,0.035) 1px, transparent 1px)",
+            backgroundSize: "18px 18px",
+          }}
+        >
+          <div className="mx-auto mb-3 w-max rounded-full px-2.5 py-1 text-[10px]" style={{ color: "#8696a0", backgroundColor: "rgba(34,46,53,0.92)" }}>
+            Today
+          </div>
+          <div className="flex justify-end">
+            <div
+              className="relative max-w-[88%] rounded-bl-xl rounded-br-md rounded-tl-xl rounded-tr-xl px-3.5 py-2.5 text-[13px]"
+              style={{
+                backgroundColor: "#005c4b",
+                color: "#e9edef",
+                lineHeight: 1.48,
+                overflowWrap: "anywhere",
+                whiteSpace: "pre-wrap",
+              }}
+            >
+              <span className="relative z-[1]">{renderWhatsAppFormattedText(message)}</span>
+              <div className="relative z-[1] mt-1.5 flex items-center justify-end gap-1 pl-8 text-[10px] leading-none" style={{ color: "rgba(233,237,239,0.7)" }}>
+                <span>12:45</span>
+                <CheckCheck size={12} />
+              </div>
+            </div>
+          </div>
+        </div>
+        <div className="flex items-center gap-1.5 px-2 py-2" style={{ backgroundColor: "#0b141a" }}>
+          <div className="flex h-8 min-w-0 flex-1 items-center px-3 text-[10px]" style={{ color: "#8696a0", backgroundColor: "#202c33", borderRadius: 999 }}>
+            Message
+          </div>
+          <span className="flex h-8 w-8 items-center justify-center rounded-full" style={{ color: "#0b141a", backgroundColor: "#00a884" }}>
+            <SendHorizontal size={14} fill="currentColor" strokeWidth={1.5} />
+          </span>
+        </div>
+        <div className="flex justify-center pb-2" style={{ backgroundColor: "#0b141a" }}>
+          <span className="h-1 w-20 rounded-full" style={{ backgroundColor: "rgba(233,237,239,0.42)" }} />
+        </div>
+      </div>
     </div>
   );
 }
@@ -266,7 +440,7 @@ function TurnNearSetup({ settings, onChange, theme }) {
   const showMinutes = settings.mode === "time" || settings.mode === "both";
 
   return (
-    <div className={`mt-3 grid gap-3 ${settings.mode === "both" ? "sm:grid-cols-3" : "sm:grid-cols-2"}`}>
+    <div className={`mb-3 grid gap-3 ${settings.mode === "both" ? "sm:grid-cols-3" : "sm:grid-cols-2"}`}>
       <label className="min-w-0">
         <span className="mb-1.5 block text-xs font-medium" style={{ color: withAlpha(fontColor, "99") }}>
           Notify By
@@ -337,6 +511,23 @@ function MessageTriggerField({ event, checked, template, onToggle, onTemplateCha
     });
   };
 
+  const applyFormatting = ({ prefix, suffix, sample }) => {
+    const textarea = textareaRef.current;
+    const start = textarea?.selectionStart ?? template.length;
+    const end = textarea?.selectionEnd ?? template.length;
+    const selectedText = template.slice(start, end) || sample;
+    const replacement = `${prefix}${selectedText}${suffix}`;
+    const nextTemplate = `${template.slice(0, start)}${replacement}${template.slice(end)}`;
+    const selectionStart = start + prefix.length;
+    const selectionEnd = selectionStart + selectedText.length;
+
+    onTemplateChange(nextTemplate);
+    window.requestAnimationFrame(() => {
+      textarea?.focus();
+      textarea?.setSelectionRange(selectionStart, selectionEnd);
+    });
+  };
+
   return (
     <div className="py-4">
       <div className="flex items-center justify-between gap-4">
@@ -361,24 +552,38 @@ function MessageTriggerField({ event, checked, template, onToggle, onTemplateCha
 
       {checked ? (
         <div className="mt-4 pl-0 sm:pl-11">
-          <p className="mb-1.5 text-xs font-medium" style={{ color: withAlpha(fontColor, "99") }}>
-            Message template
-          </p>
-          <TextArea
-            textareaRef={textareaRef}
-            value={template}
-            onChange={onTemplateChange}
-            placeholder="Write the WhatsApp message for this event"
-            accent={accentColor}
-            fontColor={fontColor}
-            borderColor={borderColor}
-            radius={radius}
-            rows={3}
-          />
-          <DynamicCodeChips onInsert={insertDynamicCode} theme={theme} />
-          {event.key === "turnNear" ? (
-            <TurnNearSetup settings={turnNearSettings} onChange={onTurnNearSettingsChange} theme={theme} />
-          ) : null}
+          <div className="grid gap-3 xl:grid-cols-[minmax(0,1fr)_minmax(14rem,0.7fr)]">
+            <div className="min-w-0">
+              {event.key === "turnNear" ? (
+                <TurnNearSetup settings={turnNearSettings} onChange={onTurnNearSettingsChange} theme={theme} />
+              ) : null}
+              <p className="mb-1.5 text-xs font-medium" style={{ color: withAlpha(fontColor, "99") }}>
+                Message template
+              </p>
+              <TextArea
+                textareaRef={textareaRef}
+                value={template}
+                onChange={onTemplateChange}
+                placeholder="Write the WhatsApp message for this event"
+                accent={accentColor}
+                fontColor={fontColor}
+                borderColor={borderColor}
+                radius={radius}
+                rows={3}
+              />
+              <p className="mb-1.5 mt-2 text-xs font-medium" style={{ color: withAlpha(fontColor, "99") }}>
+                Dynamic codes
+              </p>
+              <DynamicCodeChips onInsert={insertDynamicCode} theme={theme} />
+              <p className="mb-1.5 mt-2 text-xs font-medium" style={{ color: withAlpha(fontColor, "99") }}>
+                WhatsApp formatting
+              </p>
+              <FormattingChips onFormat={applyFormatting} theme={theme} />
+            </div>
+            <div className="min-w-0">
+              <WhatsAppPreview event={event} template={template} theme={theme} />
+            </div>
+          </div>
         </div>
       ) : null}
     </div>
@@ -397,6 +602,7 @@ export function AdminIntegrationsPage({ theme }) {
     created: true,
     turnNear: true,
     called: true,
+    absent: false,
     recalled: false,
     completed: false,
   });
