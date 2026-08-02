@@ -10,7 +10,10 @@ function withAlpha(hex, alphaHex) {
   return `${hex.startsWith("#") ? hex : `#${hex}`}${alphaHex}`;
 }
 
-function ticketStyle(status, palette) {
+function ticketStyle(ticketOrStatus, palette) {
+  const ticket = typeof ticketOrStatus === "string" ? null : ticketOrStatus;
+  const status = ticket?._deskStatus || ticketOrStatus;
+  const isNextUp = status === "waiting" && ticket?._deskPosition === 1;
   const accent = status === "called"
     ? C.amber
     : status === "serving" || status === "served"
@@ -18,11 +21,19 @@ function ticketStyle(status, palette) {
       : status === "absent" || status === "removed"
         ? C.coral
         : palette.accentColor;
+  const isFilled = status === "serving" || status === "called" || isNextUp;
+  const filledText = status === "called" ? C.inkText : "#ffffff";
   return {
-    borderColor: withAlpha(accent, "66"),
-    background: `linear-gradient(135deg, ${withAlpha(accent, "14")}, transparent 48%), var(--surface-bg, transparent)`,
+    borderColor: isFilled ? accent : withAlpha(accent, "66"),
+    background: isFilled
+      ? accent
+      : `linear-gradient(135deg, ${withAlpha(accent, "14")}, transparent 48%), var(--surface-bg, transparent)`,
     accent,
-    text: palette.fontColor,
+    text: isFilled ? filledText : palette.fontColor,
+    mutedText: isFilled ? withAlpha(filledText, status === "called" ? "b3" : "cc") : withAlpha(palette.fontColor, "70"),
+    statusText: isFilled ? filledText : accent,
+    label: isNextUp ? "next up" : status,
+    isFilled,
   };
 }
 
@@ -272,7 +283,7 @@ function DeskTicketRail({ tickets, activeFilter, expandedTicket, setExpandedTick
         className={`qp-scroll qp-scroll-compact flex min-h-[108px] min-w-0 flex-1 items-stretch gap-2 overflow-x-scroll ${showMobileScrollbar ? "qp-scroll-mobile-visible" : "qp-scroll-mobile-hidden"}`}
       >
         {visibleTickets.map((ticket, index) => {
-          const styles = ticketStyle(ticket._deskStatus, palette);
+          const styles = ticketStyle(ticket, palette);
           const isActive = expandedTicket === ticket._deskCardKey;
           const isPrimaryHighlight = ticket._deskPosition === 1 || ticket._deskStatus === "called" || ticket._deskStatus === "serving";
           const displayPosition = activeFilter === "all" ? index + 1 : ticket._deskPosition;
@@ -291,19 +302,19 @@ function DeskTicketRail({ tickets, activeFilter, expandedTicket, setExpandedTick
                 minWidth: `${cardMinWidth}px`,
                 gridTemplateColumns: `${positionColumnWidth}ch minmax(0, 1fr)`,
                 borderColor: isActive ? styles.accent : styles.borderColor,
-                background: isActive ? withAlpha(palette.fontColor, "10") : styles.background,
+                background: styles.background,
                 color: styles.text,
-                boxShadow: isActive ? `0 0 0 1px ${styles.accent} inset` : "none",
+                boxShadow: isActive ? `0 0 0 2px ${styles.isFilled ? "rgba(255,255,255,.72)" : styles.accent} inset` : "none",
               }}
             >
-              <span className="qp-ticket-face text-[2.25rem] font-semibold leading-none justify-self-center" style={{ color: isPrimaryHighlight ? palette.fontColor : withAlpha(palette.fontColor, "70"), fontVariantNumeric: "tabular-nums" }}>
+              <span className="qp-ticket-face text-[2.25rem] font-semibold leading-none justify-self-center" style={{ color: isPrimaryHighlight ? styles.text : styles.mutedText, fontVariantNumeric: "tabular-nums" }}>
                 {displayPosition}
               </span>
               <span className="min-w-0 self-center text-left">
                 <span
                   className="qp-ticket-face block truncate font-semibold leading-tight"
                   style={{
-                    color: isPrimaryHighlight ? palette.fontColor : withAlpha(palette.fontColor, "70"),
+                    color: isPrimaryHighlight ? styles.text : styles.mutedText,
                     fontVariantNumeric: "tabular-nums",
                     fontSize: digitCount >= 2 ? "1.15rem" : "1.2rem",
                   }}
@@ -313,11 +324,11 @@ function DeskTicketRail({ tickets, activeFilter, expandedTicket, setExpandedTick
                 <span
                   className="block truncate uppercase tracking-wider"
                   style={{
-                    color: styles.accent,
+                    color: styles.statusText,
                     fontSize: "11px",
                   }}
                 >
-                  {ticket._deskStatus}
+                  {styles.label}
                 </span>
               </span>
             </button>

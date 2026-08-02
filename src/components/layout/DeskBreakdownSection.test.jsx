@@ -41,7 +41,8 @@ test("uses active theme colors for counter rail tickets and popup", () => {
   expect(screen.getByLabelText("Open")).toBeInTheDocument();
   expect(screen.getByText("Ripa & Sumi")).toBeInTheDocument();
   const ticket = screen.getByRole("button", { name: /A001/i });
-  expect(ticket).toHaveStyle({ color: theme.fontColor });
+  expect(ticket).toHaveStyle({ background: theme.accentColor, color: "#ffffff" });
+  expect(screen.getByText("next up")).toBeInTheDocument();
 
   fireEvent.click(ticket);
 
