@@ -124,3 +124,64 @@ test("shows up to six assigned avatars on counter cards", () => {
   expect(screen.getAllByText(/^[A-Z][A-Z]$/)).toHaveLength(6);
   expect(screen.queryByText("GS")).not.toBeInTheDocument();
 });
+
+test("shows one all-filter rail target using next up, absent, then served priority", () => {
+  const renderSection = ({ waitingTickets = [], servedTickets = [], absentTickets = [] }) => (
+    <div style={{ "--surface-bg": theme.bgColor }}>
+      <DeskBreakdownSection
+        embedded
+        theme={theme}
+        desks={[{ id: "desk-1", name: "Counter 1", services: ["hair"], status: "Available" }]}
+        members={[]}
+        deskWord="Counter"
+        deskWordPluralLower="counters"
+        servedByDesk={{ "desk-1": servedTickets.length }}
+        absentByDesk={{ "desk-1": absentTickets.length }}
+        removedByDesk={{}}
+        waitingByDesk={{ "desk-1": waitingTickets.length }}
+        sortedQueue={waitingTickets}
+        sortedServed={servedTickets}
+        absentList={absentTickets}
+        removedLog={[]}
+        serviceName={() => "Hair Cut"}
+        now={10_000}
+        getDeskPath={() => "/counters/counter-1"}
+      />
+    </div>
+  );
+  const waitingTickets = [
+    { id: "ticket-1", label: "A001", name: "Jane", serviceId: "hair", deskId: "desk-1", createdAt: 1_000 },
+    { id: "ticket-2", label: "A002", name: "Mina", serviceId: "hair", deskId: "desk-1", createdAt: 2_000 },
+  ];
+  const servedTickets = [{ id: "served-1", label: "A000", name: "Nila", serviceId: "hair", deskId: "desk-1", createdAt: 500, completedAt: 7_000 }];
+  const absentTickets = [{ id: "absent-1", label: "A099", name: "Rina", serviceId: "hair", skippedFromDesk: "desk-1", createdAt: 800, skippedAt: 8_000 }];
+
+  const { rerender } = render(renderSection({ waitingTickets, servedTickets, absentTickets }));
+
+  expect(screen.getByLabelText("Show Counter 1 tickets from start")).toBeInTheDocument();
+  expect(screen.getByLabelText("Show Counter 1 tickets from end")).toBeInTheDocument();
+  expect(screen.queryByLabelText("Show Counter 1 next up position")).not.toBeInTheDocument();
+  expect(screen.queryByLabelText("Show Counter 1 absent tickets")).not.toBeInTheDocument();
+  expect(screen.queryByLabelText("Show Counter 1 served tickets")).not.toBeInTheDocument();
+
+  fireEvent.click(screen.getByRole("button", { name: /all/i }));
+
+  expect(screen.getByLabelText("Show Counter 1 next up position")).toBeInTheDocument();
+  expect(screen.queryByLabelText("Show Counter 1 absent tickets")).not.toBeInTheDocument();
+  expect(screen.queryByLabelText("Show Counter 1 served tickets")).not.toBeInTheDocument();
+  fireEvent.click(screen.getByLabelText("Show Counter 1 next up position"));
+
+  rerender(renderSection({ servedTickets, absentTickets }));
+
+  expect(screen.queryByLabelText("Show Counter 1 next up position")).not.toBeInTheDocument();
+  expect(screen.getByLabelText("Show Counter 1 absent tickets")).toBeInTheDocument();
+  expect(screen.queryByLabelText("Show Counter 1 served tickets")).not.toBeInTheDocument();
+  fireEvent.click(screen.getByLabelText("Show Counter 1 absent tickets"));
+
+  rerender(renderSection({ servedTickets }));
+
+  expect(screen.queryByLabelText("Show Counter 1 next up position")).not.toBeInTheDocument();
+  expect(screen.queryByLabelText("Show Counter 1 absent tickets")).not.toBeInTheDocument();
+  expect(screen.getByLabelText("Show Counter 1 served tickets")).toBeInTheDocument();
+  fireEvent.click(screen.getByLabelText("Show Counter 1 served tickets"));
+});

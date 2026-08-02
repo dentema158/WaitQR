@@ -1,5 +1,5 @@
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
-import { CalendarDays, ExternalLink, LayoutGrid, Lock, Unlock } from "lucide-react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { CalendarDays, ChevronLeft, ChevronRight, ExternalLink, LayoutGrid, Lock, Unlock } from "lucide-react";
 import { assignedMembersForDesk, memberCanBeAssignedToService, normalizeMemberRole } from "../../lib/assignments";
 import { C } from "../../lib/theme";
 import { elapsedLabel } from "../../lib/format";
@@ -201,6 +201,11 @@ function ticketJoinTime(ticket) {
   return Number.isFinite(time) ? time : 0;
 }
 
+function ticketDeskTime(ticket) {
+  const time = Number(ticket._deskTime || ticket.completedAt || ticket.skippedAt || ticket.createdAt || 0);
+  return Number.isFinite(time) ? time : 0;
+}
+
 function DeskFilterButton({ active, color, count, label, onClick, palette }) {
   return (
     <button
@@ -215,7 +220,35 @@ function DeskFilterButton({ active, color, count, label, onClick, palette }) {
   );
 }
 
-function DeskTicketRail({ tickets, activeFilter, expandedTicket, setExpandedTicket, serviceName, now, theme }) {
+function DeskRailNavButton({ children, label, onClick, palette }) {
+  return (
+    <button
+      type="button"
+      aria-label={label}
+      title={label}
+      onClick={(event) => {
+        event.stopPropagation();
+        onClick();
+      }}
+      className="qp-focusable flex h-6 w-6 shrink-0 items-center justify-center rounded-full transition-opacity hover:opacity-75"
+      style={{
+        color: withAlpha(palette.fontColor, "80"),
+      }}
+    >
+      {children}
+    </button>
+  );
+}
+
+function scrollRailTo(rail, left) {
+  if (typeof rail.scrollTo === "function") {
+    rail.scrollTo({ left, behavior: "smooth" });
+    return;
+  }
+  rail.scrollLeft = left;
+}
+
+function DeskTicketRail({ tickets, activeFilter, expandedTicket, setExpandedTicket, serviceName, now, theme, navigationAction }) {
   const palette = theme || {
     accentColor: C.blue,
     bgColor: C.ink800,
@@ -223,10 +256,13 @@ function DeskTicketRail({ tickets, activeFilter, expandedTicket, setExpandedTick
     borderColor: C.hair,
     radius: 8,
   };
-  const visibleTickets = activeFilter === "all"
-    ? [...tickets].sort((a, b) => ticketJoinTime(a) - ticketJoinTime(b))
-    : tickets.filter((ticket) => ticket._deskGroup === activeFilter);
+  const visibleTickets = useMemo(() => (
+    activeFilter === "all"
+      ? [...tickets].sort((a, b) => ticketJoinTime(a) - ticketJoinTime(b))
+      : tickets.filter((ticket) => ticket._deskGroup === activeFilter)
+  ), [activeFilter, tickets]);
   const railRef = useRef(null);
+  const ticketRefs = useRef({});
   const [showMobileScrollbar, setShowMobileScrollbar] = useState(false);
   const activeTicket = visibleTickets.find((ticket) => expandedTicket === ticket._deskCardKey) || null;
   const activeTicketPosition = activeTicket ? visibleTickets.findIndex((ticket) => ticket._deskCardKey === activeTicket._deskCardKey) + 1 : null;
@@ -265,6 +301,48 @@ function DeskTicketRail({ tickets, activeFilter, expandedTicket, setExpandedTick
   }, [activeFilter, visibleTickets.length]);
 
   useEffect(() => {
+    const rail = railRef.current;
+    if (!rail || !navigationAction) return;
+
+    if (navigationAction.type === "start") {
+      scrollRailTo(rail, 0);
+      return;
+    }
+
+    if (navigationAction.type === "end") {
+      scrollRailTo(rail, rail.scrollWidth);
+      return;
+    }
+
+    if (!["next-up", "absent", "served"].includes(navigationAction.type) || activeFilter !== "all") return;
+
+    let targetTicket = visibleTickets.find((ticket) => ticket._deskGroup === "waiting" && ticket._deskPosition === 1)
+      || visibleTickets.find((ticket) => ticket._deskStatus === "called" || ticket._deskStatus === "serving");
+
+    if (navigationAction.type === "absent") {
+      targetTicket = visibleTickets
+        .filter((ticket) => ticket._deskGroup === "absent")
+        .sort((a, b) => ticketDeskTime(b) - ticketDeskTime(a))[0];
+    }
+
+    if (navigationAction.type === "served") {
+      targetTicket = visibleTickets
+        .filter((ticket) => ticket._deskGroup === "served")
+        .sort((a, b) => ticketDeskTime(b) - ticketDeskTime(a))[0];
+    }
+
+    const targetNode = targetTicket ? ticketRefs.current[targetTicket._deskCardKey] : null;
+    if (!targetNode) return;
+
+    if (typeof targetNode.scrollIntoView === "function") {
+      targetNode.scrollIntoView({ behavior: "smooth", inline: "center", block: "nearest" });
+      return;
+    }
+
+    scrollRailTo(rail, Math.max(0, targetNode.offsetLeft - (rail.clientWidth - targetNode.clientWidth) / 2));
+  }, [navigationAction, activeFilter]);
+
+  useEffect(() => {
     if (!activeTicket) return undefined;
 
     const handleKeyDown = (event) => {
@@ -300,6 +378,10 @@ function DeskTicketRail({ tickets, activeFilter, expandedTicket, setExpandedTick
           return (
             <button
               key={ticket._deskCardKey}
+              ref={(node) => {
+                if (node) ticketRefs.current[ticket._deskCardKey] = node;
+                else delete ticketRefs.current[ticket._deskCardKey];
+              }}
               type="button"
               aria-expanded={isActive}
               onClick={() => setExpandedTicket(isActive ? null : ticket._deskCardKey)}
@@ -425,6 +507,7 @@ export function DeskBreakdownSection({
   };
   const [ticketFilters, setTicketFilters] = useState({});
   const [expandedTicket, setExpandedTicket] = useState(null);
+  const [railNavigation, setRailNavigation] = useState(null);
 
   useEffect(() => {
     if (!["all", "waiting", "served", "absent"].includes(selectedCounterFilter)) return;
@@ -452,11 +535,24 @@ export function DeskBreakdownSection({
             const currentTicket = desk.current || null;
             const activeFilter = ticketFilters[desk.id] || "waiting";
             const deskTickets = normalizeDeskTickets({ desk, sortedQueue, sortedServed, absentList, removedLog });
+            const nextUpTarget = deskTickets.find((ticket) => ticket._deskGroup === "waiting" && ticket._deskPosition === 1);
+            const absentTarget = deskTickets.find((ticket) => ticket._deskGroup === "absent");
+            const servedTarget = deskTickets.find((ticket) => ticket._deskGroup === "served");
+            const railTarget = nextUpTarget
+              ? { type: "next-up", label: "①", ariaLabel: `Show ${desk.name} next up position` }
+              : absentTarget
+                ? { type: "absent", label: "Ⓐ", ariaLabel: `Show ${desk.name} absent tickets` }
+                : servedTarget
+                  ? { type: "served", label: "Ⓢ", ariaLabel: `Show ${desk.name} served tickets` }
+                  : null;
             const statusState = deskStatusState(desk, now);
             const StatusIcon = statusState.Icon;
             const totalPrimary = served + waiting;
             const servedPct = totalPrimary > 0 ? Math.round((served / totalPrimary) * 100) : 0;
             const deskPath = getDeskPath ? getDeskPath(desk) : "/";
+            const sendRailNavigation = (type) => {
+              setRailNavigation({ deskId: desk.id, type, nonce: Date.now() });
+            };
             const setDeskFilter = (filter) => {
               setTicketFilters((current) => ({ ...current, [desk.id]: filter }));
               setExpandedTicket(null);
@@ -471,7 +567,7 @@ export function DeskBreakdownSection({
                     style={{ borderColor: palette.borderColor, background: "var(--surface-bg, transparent)" }}
                   >
                     <div className="flex min-w-0 flex-col gap-2">
-                      <div className="flex w-full min-w-0 items-center">
+                      <div className="flex w-full min-w-0 items-center gap-2">
                         <a
                           href={deskPath}
                           target="_blank"
@@ -485,6 +581,19 @@ export function DeskBreakdownSection({
                           <span className="min-w-0 truncate text-lg font-semibold leading-none">{desk.name}</span>
                           <ExternalLink size={13} className="shrink-0" style={{ color: withAlpha(palette.fontColor, "66") }} />
                         </a>
+                        <div className="ml-auto flex shrink-0 items-center gap-1">
+                          <DeskRailNavButton label={`Show ${desk.name} tickets from start`} onClick={() => sendRailNavigation("start")} palette={palette}>
+                            <ChevronLeft size={15} aria-hidden="true" />
+                          </DeskRailNavButton>
+                          {activeFilter === "all" && railTarget ? (
+                            <DeskRailNavButton label={railTarget.ariaLabel} onClick={() => sendRailNavigation(railTarget.type)} palette={palette}>
+                              <span className="text-[13px] leading-none" aria-hidden="true">{railTarget.label}</span>
+                            </DeskRailNavButton>
+                          ) : null}
+                          <DeskRailNavButton label={`Show ${desk.name} tickets from end`} onClick={() => sendRailNavigation("end")} palette={palette}>
+                            <ChevronRight size={15} aria-hidden="true" />
+                          </DeskRailNavButton>
+                        </div>
                       </div>
                       <div className="min-h-7">
                         {assignedMembers.length > 0 && (
@@ -555,6 +664,7 @@ export function DeskBreakdownSection({
                       serviceName={serviceName}
                       now={now}
                       theme={palette}
+                      navigationAction={railNavigation?.deskId === desk.id ? railNavigation : null}
                     />
                   </div>
                 </div>
