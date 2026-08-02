@@ -36,6 +36,9 @@ export function BreakdownTabsSection({
   now,
   getDeskPath,
   onNavigate,
+  selectedCounterFilter,
+  selectedCounterFilterVersion,
+  onCounterFilterReset,
 }) {
   const [activeTab, setActiveTab] = useState("desks");
   const [selectorOpen, setSelectorOpen] = useState(false);
@@ -93,6 +96,9 @@ export function BreakdownTabsSection({
       now={now}
       getDeskPath={getDeskPath}
       onNavigate={onNavigate}
+      selectedCounterFilter={selectedCounterFilter}
+      selectedCounterFilterVersion={selectedCounterFilterVersion}
+      onCounterFilterReset={onCounterFilterReset}
     />
   ) : (
     <ServiceBreakdownSection
@@ -112,6 +118,10 @@ export function BreakdownTabsSection({
       absentByDeskService={absentByDeskService}
     />
   );
+
+  useEffect(() => {
+    if (selectedCounterFilter) setActiveTab("desks");
+  }, [selectedCounterFilter, selectedCounterFilterVersion]);
 
   const content = (
     <div className="flex h-full min-h-0 flex-col">

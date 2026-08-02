@@ -25,6 +25,7 @@ import { AdminCountersPage } from "./components/admin/counters/AdminCountersPage
 import { AdminServicesPage } from "./components/admin/services/AdminServicesPage";
 import { AdminMembersPage } from "./components/admin/members/AdminMembersPage";
 import { AdminIntegrationsPage } from "./components/admin/integrations/AdminIntegrationsPage";
+import { AdminNotificationsPage } from "./components/admin/notifications/AdminNotificationsPage";
 import { AdminSettingsPage } from "./components/admin/settings/AdminSettingsPage";
 import { MemberProfilePage, ProfileHeader } from "./components/profile/MemberProfilePage";
 import { ConfirmDialog } from "./components/modals/ConfirmDialog";
@@ -1371,6 +1372,7 @@ export default function App() {
   const [newServiceDeskIds, setNewServiceDeskIds] = useState([]);
   const [newServiceDeskError, setNewServiceDeskError] = useState("");
   const [deskDetailTab, setDeskDetailTab] = useState("waiting");
+  const [dashboardCounterFilter, setDashboardCounterFilter] = useState({ filter: null, version: 0 });
   const [appearanceSettings, setAppearanceSettings] = useState(loadStoredAppearance);
   const [settingsLoaded, setSettingsLoaded] = useState(false);
   const [settingsSaveReady, setSettingsSaveReady] = useState(false);
@@ -1760,6 +1762,7 @@ export default function App() {
       pathname === "/services" ||
       pathname === "/members" ||
       pathname === "/integrations" ||
+      pathname === "/notifications" ||
       pathname === "/settings" ||
       ticketLabelFromPath ||
       memberProfilePathRequested
@@ -1784,6 +1787,7 @@ export default function App() {
       pathname === "/services" ||
       pathname === "/members" ||
       pathname === "/integrations" ||
+      pathname === "/notifications" ||
       pathname === "/settings" ||
       ticketLabelFromPath ||
       memberProfilePathRequested
@@ -1820,6 +1824,8 @@ export default function App() {
           ? "members"
         : pathname === "/integrations"
           ? "integrations"
+        : pathname === "/notifications"
+          ? "notifications"
         : pathname === "/settings"
           ? "settings"
     : activeDesk || counterDetailPathRequested
@@ -1853,7 +1859,7 @@ export default function App() {
 
   useEffect(() => {
     if (
-      !["counters", "dashboard", "desk", "integrations", "login", "members", "profile", "services", "settings"].includes(currentPage)
+      !["counters", "dashboard", "desk", "integrations", "login", "members", "notifications", "profile", "services", "settings"].includes(currentPage)
       || !settingsDirty
       || settingsSaving
       || settingsSavingRef.current
@@ -2390,10 +2396,12 @@ export default function App() {
           <StatsStrip
             joinedToday={issuedToday}
             totalServed={servedToday}
-            servedDeskCount={servedDeskCount}
-            servedDeskLabel="Served Counters"
+            fourthStatValue={absentNow}
+            fourthStatLabel="Total Absent"
             waitingNow={waitingNow}
             theme={adminTheme}
+            onCounterFilterSelect={(filter) => setDashboardCounterFilter((current) => ({ filter, version: current.version + 1 }))}
+            selectedCounterFilter={dashboardCounterFilter.filter}
           />
         </>
       )}
@@ -2499,6 +2507,8 @@ export default function App() {
         />
       ) : currentPage === "integrations" ? (
         <AdminIntegrationsPage theme={adminTheme} />
+      ) : currentPage === "notifications" ? (
+        <AdminNotificationsPage theme={adminTheme} />
       ) : currentPage === "settings" ? (
         <AdminSettingsPage
           theme={adminTheme}
@@ -2548,6 +2558,9 @@ export default function App() {
                   now={now}
                   getDeskPath={getDeskRoute}
                   onNavigate={navigate}
+                  selectedCounterFilter={dashboardCounterFilter.filter}
+                  selectedCounterFilterVersion={dashboardCounterFilter.version}
+                  onCounterFilterReset={() => setDashboardCounterFilter((current) => ({ ...current, filter: null }))}
                 />
               </div>
             </section>

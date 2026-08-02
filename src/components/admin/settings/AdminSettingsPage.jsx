@@ -8,26 +8,43 @@ const DEFAULT_SETTINGS = {
   timeFormat: "12 Hour (03:45 PM)",
   currency: "USD",
   language: "English",
-  estTime: 5,
   autoTicket: true,
   ticketPrefix: "WQ",
   resetTime: "12:00 AM",
-  soundAlert: true,
-  whatsapp: false,
-  emailNotif: true,
   showWait: true,
   showBranding: true,
   sessionTimeout: "30 Minutes",
   twoFA: false,
 };
 
+function getBrowserTimezone() {
+  if (typeof Intl === "undefined") return DEFAULT_SETTINGS.timezone;
+
+  const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  if (!timeZone) return DEFAULT_SETTINGS.timezone;
+
+  try {
+    const offsetName = new Intl.DateTimeFormat("en", {
+      timeZone,
+      timeZoneName: "longOffset",
+    }).formatToParts(new Date()).find((part) => part.type === "timeZoneName")?.value;
+    const offset = offsetName?.replace("GMT", "") || "+00:00";
+    return `(GMT${offset}) ${timeZone}`;
+  } catch {
+    return timeZone;
+  }
+}
+
 export function AdminSettingsPage({ theme, defaultAppearance, onSaveSettings, onResetQueue }) {
-  const [settings, setSettings] = useState(DEFAULT_SETTINGS);
+  const [settings, setSettings] = useState(() => ({
+    ...DEFAULT_SETTINGS,
+    timezone: getBrowserTimezone(),
+  }));
   const [savedAt, setSavedAt] = useState(null);
   const set = (key) => (value) => setSettings((current) => ({ ...current, [key]: value }));
 
   const handleReset = () => {
-    setSettings(DEFAULT_SETTINGS);
+    setSettings({ ...DEFAULT_SETTINGS, timezone: getBrowserTimezone() });
     theme.setAppearance(defaultAppearance);
     setSavedAt(null);
   };
@@ -44,19 +61,12 @@ export function AdminSettingsPage({ theme, defaultAppearance, onSaveSettings, on
           ...settings,
           systemName: theme.systemName || settings.systemName,
           setSystemName: theme.setSystemName || set("systemName"),
-          setTimezone: set("timezone"),
-          setDateFormat: set("dateFormat"),
-          setTimeFormat: set("timeFormat"),
           currency: theme.currency || settings.currency,
           setCurrency: theme.setCurrency || set("currency"),
           setLanguage: set("language"),
-          setEstTime: set("estTime"),
           setAutoTicket: set("autoTicket"),
           setTicketPrefix: set("ticketPrefix"),
           setResetTime: set("resetTime"),
-          setSoundAlert: set("soundAlert"),
-          setWhatsapp: set("whatsapp"),
-          setEmailNotif: set("emailNotif"),
           setShowWait: set("showWait"),
           setShowBranding: set("showBranding"),
           setSessionTimeout: set("sessionTimeout"),

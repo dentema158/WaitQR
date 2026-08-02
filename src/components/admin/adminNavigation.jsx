@@ -20,7 +20,7 @@ export const ADMIN_NAV_ITEMS = [
   { label: "Members", icon: Users, path: "/members", page: "members" },
   { label: "Reports", icon: FileText, path: null },
   { label: "Integrations", icon: Webhook, path: "/integrations", page: "integrations" },
-  { label: "Notifications", icon: Bell, path: null },
+  { label: "Notifications", icon: Bell, path: "/notifications", page: "notifications" },
   { label: "Settings", icon: Settings, path: "/settings", page: "settings" },
 ];
 
@@ -33,5 +33,6 @@ export const ADMIN_PAGE_META = {
   services: { title: "Services", subtitle: "Create service lines and assign them to counters.", icon: Layers3 },
   members: { title: "Members", subtitle: "Manage member profiles and counter access.", icon: Users },
   integrations: { title: "Integrations", subtitle: "Connect customer messaging and workflow tools.", icon: Webhook },
+  notifications: { title: "Notifications", subtitle: "Configure notification channels and alerts.", icon: Bell },
   settings: { title: "Settings", subtitle: "Configure global preferences and appearance.", icon: Settings },
 };

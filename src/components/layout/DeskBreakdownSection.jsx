@@ -185,6 +185,11 @@ function normalizeDeskTickets({ desk, sortedQueue, sortedServed, absentList, rem
   return [...currentCards, ...waitingCards, ...servedCards, ...absentCards, ...removedCards];
 }
 
+function ticketJoinTime(ticket) {
+  const time = Number(ticket.createdAt || ticket.joinedAt || ticket.submittedAt || ticket.issuedAt || ticket._deskTime || 0);
+  return Number.isFinite(time) ? time : 0;
+}
+
 function DeskFilterButton({ active, color, count, label, onClick, palette }) {
   return (
     <button
@@ -207,10 +212,13 @@ function DeskTicketRail({ tickets, activeFilter, expandedTicket, setExpandedTick
     borderColor: C.hair,
     radius: 8,
   };
-  const visibleTickets = tickets.filter((ticket) => ticket._deskGroup === activeFilter);
+  const visibleTickets = activeFilter === "all"
+    ? [...tickets].sort((a, b) => ticketJoinTime(a) - ticketJoinTime(b))
+    : tickets.filter((ticket) => ticket._deskGroup === activeFilter);
   const railRef = useRef(null);
   const [showMobileScrollbar, setShowMobileScrollbar] = useState(false);
   const activeTicket = visibleTickets.find((ticket) => expandedTicket === ticket._deskCardKey) || null;
+  const activeTicketPosition = activeTicket ? visibleTickets.findIndex((ticket) => ticket._deskCardKey === activeTicket._deskCardKey) + 1 : null;
 
   useEffect(() => {
     const rail = railRef.current;
@@ -252,7 +260,7 @@ function DeskTicketRail({ tickets, activeFilter, expandedTicket, setExpandedTick
   if (visibleTickets.length === 0) {
     return (
       <div className="flex min-h-[62px] flex-1 items-center px-1 py-2.5 text-xs" style={{ color: withAlpha(palette.fontColor, "66") }}>
-        No {activeFilter} tickets for this desk.
+        No {activeFilter === "all" ? "tickets" : `${activeFilter} tickets`} for this desk.
       </div>
     );
   }
@@ -263,11 +271,12 @@ function DeskTicketRail({ tickets, activeFilter, expandedTicket, setExpandedTick
         ref={railRef}
         className={`qp-scroll qp-scroll-compact flex min-h-[108px] min-w-0 flex-1 items-stretch gap-2 overflow-x-scroll ${showMobileScrollbar ? "qp-scroll-mobile-visible" : "qp-scroll-mobile-hidden"}`}
       >
-        {visibleTickets.map((ticket) => {
+        {visibleTickets.map((ticket, index) => {
           const styles = ticketStyle(ticket._deskStatus, palette);
           const isActive = expandedTicket === ticket._deskCardKey;
           const isPrimaryHighlight = ticket._deskPosition === 1 || ticket._deskStatus === "called" || ticket._deskStatus === "serving";
-          const digitCount = String(ticket._deskPosition).length;
+          const displayPosition = activeFilter === "all" ? index + 1 : ticket._deskPosition;
+          const digitCount = String(displayPosition).length;
           const positionColumnWidth = digitCount >= 3 ? 3.5 : digitCount === 2 ? 2.8 : 1.8;
           const cardMinWidth = digitCount >= 3 ? 156 : digitCount === 2 ? 144 : 124;
           return (
@@ -288,7 +297,7 @@ function DeskTicketRail({ tickets, activeFilter, expandedTicket, setExpandedTick
               }}
             >
               <span className="qp-ticket-face text-[2.25rem] font-semibold leading-none justify-self-center" style={{ color: isPrimaryHighlight ? palette.fontColor : withAlpha(palette.fontColor, "70"), fontVariantNumeric: "tabular-nums" }}>
-                {ticket._deskPosition}
+                {displayPosition}
               </span>
               <span className="min-w-0 self-center text-left">
                 <span
@@ -349,7 +358,7 @@ function DeskTicketRail({ tickets, activeFilter, expandedTicket, setExpandedTick
             </div>
 
             <div className="grid grid-cols-1 gap-2 text-sm sm:grid-cols-2" style={{ color: withAlpha(palette.fontColor, "80") }}>
-              <span className="truncate">Position {activeTicket._deskPosition}</span>
+              <span className="truncate">Position {activeFilter === "all" ? activeTicketPosition : activeTicket._deskPosition}</span>
               <span className="truncate">{activeTicket.phone || "No phone"}</span>
               <span className="truncate">{serviceName ? serviceName(activeTicket.serviceId) : activeTicket.serviceId || "General"}</span>
               <span className="truncate">{activeTicket._deskStatus === "waiting" || activeTicket._deskStatus === "called" ? "Waiting" : "Updated"} {activeTicket._deskTime ? elapsedLabel(now - activeTicket._deskTime) : "0s"} ago</span>
@@ -385,6 +394,9 @@ export function DeskBreakdownSection({
   serviceName,
   now,
   getDeskPath,
+  selectedCounterFilter,
+  selectedCounterFilterVersion,
+  onCounterFilterReset,
 }) {
   const palette = theme || {
     accentColor: C.blue,
@@ -395,6 +407,12 @@ export function DeskBreakdownSection({
   };
   const [ticketFilters, setTicketFilters] = useState({});
   const [expandedTicket, setExpandedTicket] = useState(null);
+
+  useEffect(() => {
+    if (!["all", "waiting", "served", "absent"].includes(selectedCounterFilter)) return;
+    setTicketFilters(Object.fromEntries(desks.map((desk) => [desk.id, selectedCounterFilter])));
+    setExpandedTicket(null);
+  }, [selectedCounterFilter, selectedCounterFilterVersion]);
   const content = (
     <>
       {desks.length === 0 ? (
@@ -424,6 +442,7 @@ export function DeskBreakdownSection({
             const setDeskFilter = (filter) => {
               setTicketFilters((current) => ({ ...current, [desk.id]: filter }));
               setExpandedTicket(null);
+              onCounterFilterReset?.();
             };
 
             return (
@@ -500,8 +519,8 @@ export function DeskBreakdownSection({
                         className={`grid w-full min-w-0 gap-2 pb-1 text-xs qp-mono ${removed > 0 ? "grid-cols-4" : "grid-cols-3"}`}
                         style={{ color: withAlpha(palette.fontColor, "66") }}
                       >
-                        <DeskFilterButton active={activeFilter === "served"} color={C.teal} count={served} label="served" onClick={() => setDeskFilter("served")} palette={palette} />
                         <DeskFilterButton active={activeFilter === "waiting"} color={C.amber} count={waiting} label="waiting" onClick={() => setDeskFilter("waiting")} palette={palette} />
+                        <DeskFilterButton active={activeFilter === "served"} color={C.teal} count={served} label="served" onClick={() => setDeskFilter("served")} palette={palette} />
                         <DeskFilterButton active={activeFilter === "absent"} color={C.coral} count={absent} label="absent" onClick={() => setDeskFilter("absent")} palette={palette} />
                         {removed > 0 && <DeskFilterButton active={activeFilter === "removed"} color={withAlpha(palette.fontColor, "80")} count={removed} label="removed" onClick={() => setDeskFilter("removed")} palette={palette} />}
                       </div>

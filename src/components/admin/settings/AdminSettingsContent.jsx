@@ -1,6 +1,5 @@
 import { Children, useEffect, useRef, useState } from "react";
 import {
-  Bell,
   Check,
   ChevronDown,
   Clock,
@@ -244,7 +243,7 @@ function useIsNarrow(breakpoint = 640) {
   return isNarrow;
 }
 
-function Toggle({ checked, onChange, accent }) {
+export function Toggle({ checked, onChange, accent }) {
   return (
     <button
       type="button"
@@ -324,7 +323,7 @@ function Stepper({ value, onChange, min = 1, fontColor, borderColor, radius }) {
   );
 }
 
-function Field({ label, hint, children, fontColor, inline }) {
+export function Field({ label, hint, children, fontColor, inline }) {
   const isNarrow = useIsNarrow();
   const stacked = isNarrow && !inline;
 
@@ -707,7 +706,7 @@ function LogoUpload({ logoUrl, onUpload, onRemove, fontColor, radius, borderColo
   );
 }
 
-function SectionCard({ icon: Icon, iconBg, title, children, fontColor, borderColor, radius }) {
+export function SectionCard({ icon: Icon, iconBg, title, children, fontColor, borderColor, radius }) {
   const items = Children.toArray(children);
 
   return (
@@ -756,39 +755,6 @@ export function AdminSettingsContent({ s, theme, defaultAppearance }) {
   return (
     <div className="space-y-4 px-2.5 py-2.5 sm:space-y-6 sm:px-6 sm:py-6 md:pl-10 md:pr-6">
       <SectionCard icon={Settings} iconBg={accentColor} title="General Settings" {...cardProps}>
-        <Field label="System Timezone" hint="Set the default timezone for the system" fontColor={fontColor}>
-          <Select
-            value={s.timezone}
-            onChange={s.setTimezone}
-            accent={accentColor}
-            fontColor={fontColor}
-            borderColor={borderColor}
-            radius={radius}
-            options={["(GMT+05:30) Asia/Kolkata", "(GMT+00:00) UTC", "(GMT-05:00) America/New_York", "(GMT+01:00) Europe/Berlin"]}
-          />
-        </Field>
-        <Field label="Date Format" hint="Set the default date format" fontColor={fontColor}>
-          <Select
-            value={s.dateFormat}
-            onChange={s.setDateFormat}
-            accent={accentColor}
-            fontColor={fontColor}
-            borderColor={borderColor}
-            radius={radius}
-            options={["DD MMM YYYY (12 Jul 2025)", "MM/DD/YYYY (07/12/2025)", "YYYY-MM-DD (2025-07-12)"]}
-          />
-        </Field>
-        <Field label="Time Format" hint="Set the default time format" fontColor={fontColor}>
-          <Select
-            value={s.timeFormat}
-            onChange={s.setTimeFormat}
-            accent={accentColor}
-            fontColor={fontColor}
-            borderColor={borderColor}
-            radius={radius}
-            options={["12 Hour (03:45 PM)", "24 Hour (15:45)"]}
-          />
-        </Field>
         <Field label="Currency" hint="Used for service prices" fontColor={fontColor}>
           <Select
             value={s.currency}
@@ -840,9 +806,6 @@ export function AdminSettingsContent({ s, theme, defaultAppearance }) {
       </SectionCard>
 
       <SectionCard icon={Users} iconBg={accentColor} title="Queue Settings" {...cardProps}>
-        <Field label="Default Estimated Time" hint="Default time (in minutes) for new services" fontColor={fontColor}>
-          <Stepper value={s.estTime} onChange={s.setEstTime} min={1} fontColor={fontColor} borderColor={borderColor} radius={radius} />
-        </Field>
         <Field label="Auto Generate Ticket Number" hint="Automatically generate ticket numbers" inline fontColor={fontColor}>
           <div className="flex justify-end">
             <Toggle checked={s.autoTicket} onChange={s.setAutoTicket} accent={accentColor} />
@@ -861,24 +824,6 @@ export function AdminSettingsContent({ s, theme, defaultAppearance }) {
               className="w-full border px-3 py-2 text-sm outline-none transition-colors"
             />
             <Clock size={15} className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2" style={{ color: withAlpha(fontColor, "80") }} />
-          </div>
-        </Field>
-      </SectionCard>
-
-      <SectionCard icon={Bell} iconBg={accentColor} title="Notifications Settings" {...cardProps}>
-        <Field label="Sound Alert" hint="Play sound when next ticket is called" inline fontColor={fontColor}>
-          <div className="flex justify-end">
-            <Toggle checked={s.soundAlert} onChange={s.setSoundAlert} accent={accentColor} />
-          </div>
-        </Field>
-        <Field label="WhatsApp Notifications" hint="Send WhatsApp alerts to assigned members" inline fontColor={fontColor}>
-          <div className="flex justify-end">
-            <Toggle checked={s.whatsapp} onChange={s.setWhatsapp} accent={accentColor} />
-          </div>
-        </Field>
-        <Field label="Email Notifications" hint="Send email notifications for important events" inline fontColor={fontColor}>
-          <div className="flex justify-end">
-            <Toggle checked={s.emailNotif} onChange={s.setEmailNotif} accent={accentColor} />
           </div>
         </Field>
       </SectionCard>
