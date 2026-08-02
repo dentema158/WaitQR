@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { CalendarDays, ExternalLink, LayoutGrid, Lock, Unlock } from "lucide-react";
 import { assignedMembersForDesk, memberCanBeAssignedToService, normalizeMemberRole } from "../../lib/assignments";
 import { C } from "../../lib/theme";
@@ -257,6 +257,13 @@ function DeskTicketRail({ tickets, activeFilter, expandedTicket, setExpandedTick
     };
   }, [activeFilter]);
 
+  useLayoutEffect(() => {
+    const rail = railRef.current;
+    if (!rail) return;
+
+    rail.scrollLeft = rail.scrollWidth;
+  }, [activeFilter, visibleTickets.length]);
+
   useEffect(() => {
     if (!activeTicket) return undefined;
 
@@ -458,7 +465,7 @@ export function DeskBreakdownSection({
 
             return (
               <div key={desk.id} className="min-w-0">
-                <div className="grid min-w-0 grid-cols-1 items-stretch gap-3 py-2.5 md:grid-cols-[minmax(240px,280px)_minmax(0,1fr)]">
+                <div className="grid min-w-0 grid-cols-1 items-stretch gap-3 py-2.5 md:grid-cols-[minmax(280px,320px)_minmax(0,1fr)]">
                   <div
                     className="flex min-h-[108px] min-w-0 w-full flex-col gap-2.5 rounded-md border px-3 py-2.5"
                     style={{ borderColor: palette.borderColor, background: "var(--surface-bg, transparent)" }}
@@ -527,9 +534,10 @@ export function DeskBreakdownSection({
                       </div>
 
                       <div
-                        className={`grid w-full min-w-0 gap-2 pb-1 text-xs qp-mono ${removed > 0 ? "grid-cols-4" : "grid-cols-3"}`}
+                        className="grid w-full min-w-0 grid-cols-4 gap-1 pb-1 text-xs qp-mono"
                         style={{ color: withAlpha(palette.fontColor, "66") }}
                       >
+                        <DeskFilterButton active={activeFilter === "all"} color={palette.accentColor} count={deskTickets.length} label="all" onClick={() => setDeskFilter("all")} palette={palette} />
                         <DeskFilterButton active={activeFilter === "waiting"} color={C.amber} count={waiting} label="waiting" onClick={() => setDeskFilter("waiting")} palette={palette} />
                         <DeskFilterButton active={activeFilter === "served"} color={C.teal} count={served} label="served" onClick={() => setDeskFilter("served")} palette={palette} />
                         <DeskFilterButton active={activeFilter === "absent"} color={C.coral} count={absent} label="absent" onClick={() => setDeskFilter("absent")} palette={palette} />
